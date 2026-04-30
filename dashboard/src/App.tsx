@@ -158,7 +158,8 @@ function LandingPage() {
   return (
     <section className="landing">
       <nav className="landing-nav" aria-label="Landing navigation">
-          <img src="/Logof.png" alt="Shame The Web" className="brand-logo" />
+          {/* <img src="/Logof.png" alt="Shame The Web" className="brand-logo" /> */}
+          <img src="/Tlogo.png" alt="Shame The Web" className="brand-logo" />
         <div>
           <a href="#how-it-works">How it works</a>
           <a href="/dashboard">Dashboard</a>
@@ -186,6 +187,29 @@ function LandingPage() {
             </a>
           </div>
           <p className="hero-microcopy">No spreadsheets. No corporate dashboards. Just scores, roasts, and useful clues.</p>
+          <div className="hero-visual" aria-hidden="true">
+            <span className="hero-star hero-star-large">✦</span>
+            <span className="hero-star hero-star-small">✧</span>
+            <span className="hero-dot hero-dot-lime" />
+            <span className="hero-dot hero-dot-pink" />
+            <div className="hero-throttle">
+              <span />
+            </div>
+            <div className="hero-speedometer">
+              <div className="speedometer-arc">
+                <span className="speedometer-tick tick-1" />
+                <span className="speedometer-tick tick-2" />
+                <span className="speedometer-tick tick-3" />
+                <span className="speedometer-tick tick-4" />
+                <span className="speedometer-needle" />
+                <span className="speedometer-center" />
+              </div>
+              <div className="speedometer-readout">
+                {/* <span>88</span>
+                <small>web score</small> */}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
