@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { summarizeVisits } from "@shame-the-web/shared";
 import type { DashboardStats, ScoreCategory, UserProfile, VisitRecord } from "@shame-the-web/shared";
 
-import { resolveAppRoute } from "./lib/app-routing";
+import { navigate, resolveAppRoute } from "./lib/app-routing";
 import { requestBridge } from "./lib/bridge";
 import {
   formatScore,
@@ -20,6 +20,28 @@ import {
 
 import { HandWrittenTitle } from "./components/ui/hand-writing-text";
 import { NotFoundPage } from "./components/ui/404-page-not-found";
+
+function Link({ href, className, children }: { href: string; className?: string; children: React.ReactNode }) {
+  const isInternal = href.startsWith("/") && !href.startsWith("//");
+
+  function handleClick(e: React.MouseEvent<HTMLAnchorElement>) {
+    if (!isInternal) return;
+    const [path, hash] = href.split("#");
+    e.preventDefault();
+    navigate(path || "/");
+    if (hash) {
+      requestAnimationFrame(() => {
+        document.getElementById(hash)?.scrollIntoView({ behavior: "smooth" });
+      });
+    }
+  }
+
+  return (
+    <a href={href} className={className} onClick={handleClick}>
+      {children}
+    </a>
+  );
+}
 
 const categories: Array<{
   key: ScoreCategory;
@@ -158,33 +180,32 @@ function LandingPage() {
   return (
     <section className="landing">
       <nav className="landing-nav" aria-label="Landing navigation">
-          {/* <img src="/Logof.png" alt="Shame The Web" className="brand-logo" /> */}
-          <img src="/Tlogo.png" alt="Shame The Web" className="brand-logo" />
+            <img src="/Tlogo.png" alt="Shame The Web" className="brand-logo" />
         <div>
           <a href="#how-it-works">How it works</a>
-          <a href="/dashboard">Dashboard</a>
-          <a href="/dashboard#scores">Scores</a>
+          <Link href="/dashboard">Dashboard</Link>
+          <Link href="/dashboard#scores">Scores</Link>
         </div>
       </nav>
 
       <div className="hero-grid">
         <div className="hero-copy">
           <p className="eyebrow">A playful performance coach for your browser</p>
-          <h1>The web has been getting away with murder.</h1>
+          <h1>The &nbsp; web &nbsp; has been getting away &nbsp; with &nbsp; &nbsp;&nbsp;&nbsp;&nbsp; murder.</h1>
           <p className="hero-lede">
             Shame The Web watches real browsing performance, scores the pages you visit, and turns slow sites
             into teachable roast material.
           </p>
           <div className="hero-actions">
-            <a className="button button-primary" href="/dashboard">
+            <Link className="button button-primary" href="/dashboard">
               Open Dashboard
-            </a>
-            <a className="button button-secondary" href="/dashboard#scores">
+            </Link>
+            <Link className="button button-secondary" href="/dashboard#scores">
               See Scores
-            </a>
-            <a className="button button-ghost" href="/dashboard#history">
+            </Link>
+            <Link className="button button-ghost" href="/dashboard#history">
               View Roast History
-            </a>
+            </Link>
           </div>
           <p className="hero-microcopy">No spreadsheets. No corporate dashboards. Just scores, roasts, and useful clues.</p>
           <div className="hero-visual" aria-hidden="true">
@@ -501,9 +522,9 @@ function DashboardSidebar({ hasVisits }: { hasVisits: boolean }) {
   return (
     <aside className="dashboard-sidebar">
       <div>
-        <a className="sidebar-brand" href="/">
+        <Link className="sidebar-brand" href="/">
           STW
-        </a>
+        </Link>
         <p>Scores, roasts, and tiny performance consequences.</p>
       </div>
       <nav aria-label="Dashboard navigation">
@@ -516,9 +537,9 @@ function DashboardSidebar({ hasVisits }: { hasVisits: boolean }) {
       <div className="sidebar-callout">
         <span>Coach Mode</span>
         <p>{hasVisits ? "Watching for slow pages, weird delays, and layout chaos." : "Waiting for a few pages to judge."}</p>
-        <a className="button button-primary" href="/">
+        <Link className="button button-primary" href="/">
           Back to Landing
-        </a>
+        </Link>
       </div>
     </aside>
   );

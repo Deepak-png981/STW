@@ -1,5 +1,10 @@
 export type AppRoute = "landing" | "dashboard" | "404";
 
+export function navigate(path: string): void {
+  window.history.pushState({}, "", path);
+  window.dispatchEvent(new PopStateEvent("popstate"));
+}
+
 export function resolveAppRoute(pathname: string): AppRoute {
   const normalizedPath = normalizePath(pathname);
 
