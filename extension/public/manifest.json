@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Shame The Web",
+  "description": "Playfully benchmarks websites and serves tiny speed roasts.",
+  "version": "0.0.0",
+  "action": {
+    "default_popup": "popup/index.html",
+    "default_title": "Shame The Web"
+  },
+  "options_page": "options/index.html",
+  "background": {
+    "service_worker": "assets/background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["assets/content.js"],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": ["http://localhost:5173/*"],
+      "js": ["assets/bridge.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "host_permissions": ["http://*/*", "https://*/*", "http://localhost:5173/*"],
+  "permissions": ["storage", "tabs"]
+}

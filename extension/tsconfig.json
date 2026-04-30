@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"],
+    "types": ["chrome", "vitest/globals"],
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/extension.tsbuildinfo",
+    "paths": {
+      "@shame-the-web/shared": ["../shared/src/index.ts"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "references": [{ "path": "../shared" }]
+}

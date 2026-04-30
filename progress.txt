@@ -1,0 +1,23 @@
+PlanVersion: Shame The Web Multi-Phase Execution Plan - 2026-04-29
+
+Backlog:
+- none
+
+InProgress:
+- none
+
+Done:
+- init-progress-tracker: Created progress.txt with plan version, backlog, active task, blocker log, and next queue. Verified by reading file contents.
+- scaffold-monorepo: Created npm workspaces for extension, dashboard, and shared packages with TypeScript/Vite tooling. Verified with `npm run typecheck && npm run build` (exit 0).
+- local-auth-storage: Added typed extension storage, local sign up/login/session behavior, and popup/options wiring. Verified with `npx vitest run extension/src/lib/storage.test.ts && npm run typecheck && npm run build` (exit 0).
+- metrics-scoring: Added page metric collection, score computation out of 100 and category scores out of 10/100, visit record creation, and visit persistence. Verified with `npx vitest run extension/src/lib/scoring.test.ts extension/src/lib/storage.test.ts && npm run typecheck && npm run build` (exit 0).
+- roast-engine: Added 20 templates per score category, score-band mapping, and recent-template avoidance. Verified with `npx vitest run extension/src/lib/roast-templates.test.ts && npm run typecheck && npm run build` (exit 0).
+- overlay-popup: Wired content-script metric capture, toast rendering/cooldown, visit persistence, recent template memory, and popup latest-site summary with dashboard navigation. Verified with `npx vitest run extension/src/content/toast.test.ts extension/src/lib/storage.test.ts extension/src/lib/scoring.test.ts extension/src/lib/roast-templates.test.ts && npm run typecheck && npm run build` (exit 0).
+- dashboard-pages: Added shared dashboard summary helper and dashboard Home, Stats, and History views with local empty states. Verified with `npx vitest run shared/src/stats.test.ts && npm run typecheck && npm run build` (exit 0).
+- bridge-integration: Added background bridge handler, localhost content-script relay, and dashboard postMessage client. Verified with `npx vitest run extension/src/background/bridge-handler.test.ts shared/src/stats.test.ts && npm run typecheck && npm run build` (exit 0).
+- e2e-verify: Ran full verification with `npm test && npm run typecheck && npm run build` plus artifact checks for extension and dashboard outputs (exit 0). Opened `http://localhost:5173/` in browser and verified dashboard renders empty local-profile/history/stats state. Re-ran the final gate after switching extension packaging to self-contained esbuild bundles (exit 0). Full extension-installed browse flow still requires loading `extension/dist` in Chrome.
+
+Blocked:
+
+Next:
+- none
