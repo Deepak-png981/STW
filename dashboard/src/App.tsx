@@ -158,9 +158,7 @@ function LandingPage() {
   return (
     <section className="landing">
       <nav className="landing-nav" aria-label="Landing navigation">
-        <a className="brand-pill" href="#top" aria-label="Shame The Web home">
-          Shame The Web
-        </a>
+          <img src="/Logof.png" alt="Shame The Web" className="brand-logo" />
         <div>
           <a href="#how-it-works">How it works</a>
           <a href="/dashboard">Dashboard</a>

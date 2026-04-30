@@ -125,7 +125,7 @@ p {
   background: #c9d67a;
   display: flex;
   justify-content: space-between;
-  padding: 0.9rem;
+  padding: 0.5rem;
 }
 
 .landing-nav > div {
@@ -151,7 +151,18 @@ p {
   border-radius: 999px;
   color: #f7f7f4;
   font-weight: 800;
-  padding: 0.7rem 1rem;
+  /* padding: 0rem 0rem; */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* height: fit-content; */
+}
+
+.brand-logo {
+  height: 3rem;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
 }
 
 .hero-grid {
