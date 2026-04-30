@@ -7,7 +7,8 @@
     "rootDir": "src",
     "tsBuildInfoFile": "dist/dashboard.tsbuildinfo",
     "paths": {
-      "@shame-the-web/shared": ["../shared/src/index.ts"]
+      "@shame-the-web/shared": ["../shared/src/index.ts"],
+      "@/*": ["./src/*"]
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],

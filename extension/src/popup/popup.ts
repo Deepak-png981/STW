@@ -44,7 +44,7 @@ async function renderPopup() {
     `;
 
     document.querySelector("#open-dashboard")?.addEventListener("click", () => {
-      void chrome.tabs.create({ url: "http://localhost:5173/" });
+      void chrome.tabs.create({ url: "http://localhost:5173/dashboard" });
     });
     return;
   }

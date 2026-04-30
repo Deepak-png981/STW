@@ -7,6 +7,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: {
+      "@": resolve(__dirname, "./src"),
       "@shame-the-web/shared": resolve(__dirname, "../shared/src/index.ts")
     }
   }
