@@ -1,14 +1,14 @@
 import { chromeStorageDriver, createUser, getActiveUser, getState, loginUser } from "../lib/storage";
 
-const app = document.querySelector<HTMLDivElement>("#app");
+const appRoot = document.querySelector<HTMLDivElement>("#app");
 
-if (!app) {
+if (!appRoot) {
   throw new Error("Popup root was not found.");
 }
 
-void renderPopup();
+void renderPopup(appRoot);
 
-async function renderPopup() {
+async function renderPopup(app: HTMLDivElement) {
   const [activeUser, state] = await Promise.all([
     getActiveUser(chromeStorageDriver),
     getState(chromeStorageDriver)
@@ -71,7 +71,11 @@ async function renderPopup() {
 
   document.querySelector<HTMLFormElement>("#signup-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const target = event.currentTarget;
+    if (!(target instanceof HTMLFormElement)) {
+      return;
+    }
+    const form = new FormData(target);
     const name = String(form.get("name") ?? "").trim();
     const email = String(form.get("email") ?? "").trim();
 
@@ -85,7 +89,7 @@ async function renderPopup() {
       await createUser(chromeStorageDriver, { name, email });
     }
 
-    await renderPopup();
+    await renderPopup(app);
   });
 }
 

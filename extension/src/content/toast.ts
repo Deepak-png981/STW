@@ -1,3 +1,5 @@
+import { designTokensAsCssVariables } from "@shame-the-web/shared";
+
 let lastToastUrl: string | null = null;
 let lastToastAt = 0;
 
@@ -57,6 +59,8 @@ function escapeHtml(value: string): string {
 }
 
 const styles = `
+  ${designTokensAsCssVariables(":host, :root")}
+
   [data-shame-toast] {
     position: fixed;
     top: 18px;
@@ -66,12 +70,12 @@ const styles = `
     gap: 4px;
     max-width: min(360px, calc(100vw - 36px));
     padding: 12px 14px;
-    border: 1px solid rgba(120, 53, 15, 0.18);
-    border-radius: 16px;
-    background: #1f160f;
-    color: #fff8ef;
-    box-shadow: 0 18px 60px rgba(31, 22, 15, 0.28);
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    border: 1px solid var(--stw-border-subtle);
+    border-radius: var(--stw-radius-medium);
+    background: var(--stw-card-surface-dark);
+    color: var(--stw-text-primary-dark);
+    box-shadow: 0 18px 60px rgba(28, 28, 32, 0.28);
+    font-family: var(--stw-font-family);
     line-height: 1.3;
     animation: stweb-toast-in 180ms ease-out;
   }
@@ -81,7 +85,7 @@ const styles = `
   }
 
   [data-shame-toast] span {
-    color: #f2d7b5;
+    color: var(--stw-accent-lime);
     font-size: 12px;
   }
 

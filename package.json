@@ -11,6 +11,7 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "dev:dashboard": "npm run dev -w dashboard",
+    "dev:extension": "npm run dev -w extension",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },

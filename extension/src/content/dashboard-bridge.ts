@@ -23,7 +23,11 @@ function isDashboardRequest(message: unknown): message is BridgeRequest {
   return (
     candidate.source === SHAME_THE_WEB_BRIDGE_SOURCE &&
     typeof candidate.id === "string" &&
-    (candidate.type === "getSession" || candidate.type === "getVisits" || candidate.type === "getStats")
+    (candidate.type === "ping" ||
+      candidate.type === "getSession" ||
+      candidate.type === "getVisits" ||
+      candidate.type === "getStats" ||
+      candidate.type === "getRoasts")
   );
 }
 

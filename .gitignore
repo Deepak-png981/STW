@@ -4,3 +4,8 @@ coverage/
 .DS_Store
 *.log
 .vercel
+extension/.plasmo/
+extension/build/
+.env.production
+.env.development
+.env.local

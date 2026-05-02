@@ -19,33 +19,57 @@ export function handleBridgeRequest(message: unknown, state: StoredState): Bridg
   const activeUser = state.users.find((user) => user.id === state.activeUserId) ?? null;
   const visits = activeUser ? state.visits.filter((visit) => visit.userId === activeUser.id) : [];
 
-  if (message.type === "getSession") {
-    return {
-      id: message.id,
-      source: SHAME_THE_WEB_EXTENSION_SOURCE,
-      ok: true,
-      type: "getSession",
-      data: { activeUser }
-    };
+  switch (message.type) {
+    case "ping":
+      return {
+        id: message.id,
+        source: SHAME_THE_WEB_EXTENSION_SOURCE,
+        ok: true,
+        type: "ping",
+        data: { version: getExtensionVersion() }
+      };
+    case "getSession":
+      return {
+        id: message.id,
+        source: SHAME_THE_WEB_EXTENSION_SOURCE,
+        ok: true,
+        type: "getSession",
+        data: { activeUser }
+      };
+    case "getVisits":
+      return {
+        id: message.id,
+        source: SHAME_THE_WEB_EXTENSION_SOURCE,
+        ok: true,
+        type: "getVisits",
+        data: { visits }
+      };
+    case "getStats":
+      return {
+        id: message.id,
+        source: SHAME_THE_WEB_EXTENSION_SOURCE,
+        ok: true,
+        type: "getStats",
+        data: summarizeVisits(visits)
+      };
+    case "getRoasts":
+      return {
+        id: message.id,
+        source: SHAME_THE_WEB_EXTENSION_SOURCE,
+        ok: true,
+        type: "getRoasts",
+        data: { visits }
+      };
+    default: {
+      const exhaustiveCheck: never = message.type;
+      return exhaustiveCheck;
+    }
   }
+}
 
-  if (message.type === "getVisits") {
-    return {
-      id: message.id,
-      source: SHAME_THE_WEB_EXTENSION_SOURCE,
-      ok: true,
-      type: "getVisits",
-      data: { visits }
-    };
-  }
-
-  return {
-    id: message.id,
-    source: SHAME_THE_WEB_EXTENSION_SOURCE,
-    ok: true,
-    type: "getStats",
-    data: summarizeVisits(visits)
-  };
+function getExtensionVersion(): string {
+  const runtime = globalThis.chrome?.runtime;
+  return runtime?.getManifest?.().version ?? "0.0.0";
 }
 
 function isBridgeRequest(message: unknown): message is BridgeRequest {
@@ -57,6 +81,10 @@ function isBridgeRequest(message: unknown): message is BridgeRequest {
   return (
     candidate.source === SHAME_THE_WEB_BRIDGE_SOURCE &&
     typeof candidate.id === "string" &&
-    (candidate.type === "getSession" || candidate.type === "getVisits" || candidate.type === "getStats")
+    (candidate.type === "ping" ||
+      candidate.type === "getSession" ||
+      candidate.type === "getVisits" ||
+      candidate.type === "getStats" ||
+      candidate.type === "getRoasts")
   );
 }

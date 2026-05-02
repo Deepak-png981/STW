@@ -1,13 +1,35 @@
 {
   "name": "@shame-the-web/extension",
-  "version": "0.0.0",
+  "displayName": "Shame The Web",
+  "description": "Playfully benchmarks websites and serves tiny speed roasts.",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
+  "icon": "assets/logo.png",
   "scripts": {
-    "build": "node build.mjs",
+    "dev": "plasmo dev",
+    "build": "plasmo build",
+    "package": "plasmo package",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@shame-the-web/shared": "0.0.0"
+    "@shame-the-web/shared": "0.0.0",
+    "plasmo": "^0.90.5",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  },
+  "manifest": {
+    "name": "Shame The Web",
+    "background_color": "#e7e7e7",
+    "theme_color": "#c9d67a",
+    "permissions": ["storage", "tabs"],
+    "host_permissions": ["http://*/*", "https://*/*"],
+    "externally_connectable": {
+      "matches": [
+        "http://localhost:5173/*",
+        "https://shametheweb.com/*",
+        "https://www.shametheweb.com/*"
+      ]
+    }
   }
 }

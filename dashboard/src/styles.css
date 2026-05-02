@@ -4,12 +4,32 @@
 @tailwind utilities;
 
 :root {
-  color: #101114;
-  background: #c9d67a;
+  color: var(--stw-text-primary-light);
+  background: var(--stw-app-background);
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+
+  --stw-app-background: #c9d67a;
+  --stw-shell-outline: #1f1f22;
+  --stw-sidebar-background: #19191d;
+  --stw-main-surface: #e7e7e7;
+  --stw-card-surface-light: #f3f3f1;
+  --stw-card-surface-dark: #1c1c20;
+  --stw-text-primary-light: #101114;
+  --stw-text-secondary-light: #5e6066;
+  --stw-text-primary-dark: #f7f7f4;
+  --stw-text-secondary-dark: #b8bbc2;
+  --stw-border-subtle: #d9d9d6;
+  --stw-accent-lime: #d7eb59;
+  --stw-accent-lavender: #beb2f6;
+  --stw-accent-soft-purple: #cfc7fa;
+  --stw-accent-chart-dark: #202025;
+  --stw-accent-muted-olive: #9aa05a;
+  --stw-radius-card: 24px;
+  --stw-radius-shell: 32px;
+  --stw-radius-pill: 999px;
 
   /* shadcn/ui CSS variables */
   --background: 0 0% 100%;
@@ -91,7 +111,7 @@ h3 {
 }
 
 p {
-  color: #5e6066;
+  color: var(--stw-text-secondary-light);
   line-height: 1.45;
 }
 
@@ -112,8 +132,8 @@ p {
 }
 
 .landing {
-  background: #1f1f22;
-  border: 5px solid #1f1f22;
+  background: var(--stw-shell-outline);
+  border: 5px solid var(--stw-shell-outline);
   border-radius: 32px;
   display: grid;
   gap: 1.25rem;
@@ -122,7 +142,7 @@ p {
 
 .landing-nav {
   align-items: center;
-  background: #c9d67a;
+  background: var(--stw-app-background);
   display: flex;
   justify-content: space-between;
   padding: 0.5rem;
@@ -268,7 +288,7 @@ p {
 }
 
 .hero-grid {
-  background: #c9d67a;
+  background: var(--stw-app-background);
   display: grid;
   gap: 0;
   grid-template-columns: 1fr;
@@ -283,8 +303,8 @@ p {
 
 .hero-copy {
   align-content: center;
-  background: #19191d;
-  color: #f7f7f4;
+  background: var(--stw-sidebar-background);
+  color: var(--stw-text-primary-dark);
   display: grid;
   gap: 1.25rem;
   min-height: clamp(640px, 76vh, 920px);
@@ -300,7 +320,7 @@ p {
 }
 
 .hero-copy h1 {
-  color: #f7f7f4;
+  color: var(--stw-text-primary-dark);
   font-family: Kablammo, Inter, system-ui, sans-serif;
   font-size: clamp(4rem, 10vw, 8.8rem);
   font-weight: 400;
@@ -310,7 +330,7 @@ p {
 }
 
 .hero-copy p {
-  color: #d9d9d6;
+  color: var(--stw-border-subtle);
 }
 
 .hero-lede {
@@ -631,23 +651,23 @@ p {
 }
 
 .button-primary {
-  background: #d7eb59;
-  color: #101114;
+  background: var(--stw-accent-lime);
+  color: var(--stw-text-primary-light);
 }
 
 .button-secondary {
-  background: #f3f3f1;
-  color: #101114;
+  background: var(--stw-card-surface-light);
+  color: var(--stw-text-primary-light);
 }
 
 .button-ghost {
   border: 1px solid rgba(247, 247, 244, 0.22);
-  color: #f7f7f4;
+  color: var(--stw-text-primary-dark);
 }
 
 .button-dark {
-  background: #1c1c20;
-  color: #f7f7f4;
+  background: var(--stw-card-surface-dark);
+  color: var(--stw-text-primary-dark);
 }
 
 .preview-card,
@@ -657,7 +677,7 @@ p {
 .coach-card,
 .section-card,
 .education-card {
-  background: #f3f3f1;
+  background: var(--stw-card-surface-light);
   border: 1px solid rgba(16, 17, 20, 0.06);
   border-radius: 24px;
 }
@@ -708,7 +728,7 @@ p {
 
 .mini-bar div,
 .score-track {
-  background: #d9d9d6;
+  background: var(--stw-border-subtle);
   border-radius: 999px;
   height: 10px;
   overflow: hidden;
@@ -716,7 +736,7 @@ p {
 
 .mini-bar div span,
 .score-track span {
-  background: linear-gradient(90deg, #d7eb59, #beb2f6);
+  background: linear-gradient(90deg, var(--stw-accent-lime), var(--stw-accent-lavender));
   border-radius: inherit;
   display: block;
   height: 100%;
@@ -724,7 +744,7 @@ p {
 
 .landing-section,
 .trust-card {
-  background: #e7e7e7;
+  background: var(--stw-main-surface);
   display: grid;
   gap: 1rem;
   margin: 0 clamp(1rem, 3vw, 2rem);
@@ -792,8 +812,8 @@ p {
 }
 
 .dashboard-shell {
-  background: #1f1f22;
-  border: 5px solid #1f1f22;
+  background: var(--stw-shell-outline);
+  border: 5px solid var(--stw-shell-outline);
   border-radius: 32px;
   display: grid;
   gap: 1rem;
@@ -803,7 +823,7 @@ p {
 
 .dashboard-sidebar {
   align-content: space-between;
-  background: #19191d;
+  background: var(--stw-sidebar-background);
   border-radius: 28px;
   color: #f7f7f4;
   display: grid;
@@ -812,7 +832,7 @@ p {
 }
 
 .dashboard-sidebar p {
-  color: #b8bbc2;
+  color: var(--stw-text-secondary-dark);
 }
 
 .sidebar-brand {
@@ -864,7 +884,7 @@ p {
 }
 
 .dashboard-canvas {
-  background: #e7e7e7;
+  background: var(--stw-main-surface);
   border-radius: 28px;
   display: grid;
   gap: 1rem;
@@ -890,7 +910,7 @@ p {
 }
 
 .bridge-status {
-  color: #5e6066;
+  color: var(--stw-text-secondary-light);
   font-size: 0.82rem;
   font-weight: 700;
 }

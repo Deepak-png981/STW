@@ -52,6 +52,16 @@ const state: StoredState = {
 };
 
 describe("dashboard bridge handler", () => {
+  it("returns extension version on ping", () => {
+    const response = handleBridgeRequest(request("ping"), state);
+
+    expect(response.ok).toBe(true);
+    expect(response.type).toBe("ping");
+    if (response.ok && response.type === "ping") {
+      expect(response.data.version).toBeTypeOf("string");
+    }
+  });
+
   it("returns the active local session", () => {
     const response = handleBridgeRequest(request("getSession"), state);
 
@@ -79,6 +89,17 @@ describe("dashboard bridge handler", () => {
     if (response.ok && response.type === "getVisits") {
       expect(response.data.visits).toHaveLength(1);
       expect(response.data.visits[0]?.userId).toBe("user-1");
+    }
+  });
+
+  it("returns roast history data for dashboard replay", () => {
+    const response = handleBridgeRequest(request("getRoasts"), state);
+
+    expect(response.ok).toBe(true);
+    expect(response.type).toBe("getRoasts");
+    if (response.ok && response.type === "getRoasts") {
+      expect(response.data.visits).toHaveLength(1);
+      expect(response.data.visits[0]?.hostname).toBe("example.com");
     }
   });
 

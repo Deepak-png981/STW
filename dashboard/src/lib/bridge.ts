@@ -1,5 +1,5 @@
 import { SHAME_THE_WEB_BRIDGE_SOURCE, SHAME_THE_WEB_EXTENSION_SOURCE } from "@shame-the-web/shared";
-import type { BridgeRequest, BridgeResponse } from "@shame-the-web/shared";
+import type { BridgeEvent, BridgeRequest, BridgeResponse } from "@shame-the-web/shared";
 
 const REQUEST_TIMEOUT_MS = 1500;
 
@@ -39,6 +39,27 @@ export async function requestBridge<T extends BridgeRequest["type"]>(
   });
 }
 
+export async function pingBridge(): Promise<string> {
+  const response = await requestBridge("ping");
+  return response.data.version;
+}
+
+export function subscribeBridgeEvents(handler: (event: BridgeEvent) => void): () => void {
+  function handleMessage(event: MessageEvent<unknown>) {
+    if (event.source !== window || !isBridgeEvent(event.data)) {
+      return;
+    }
+
+    handler(event.data);
+  }
+
+  window.addEventListener("message", handleMessage);
+
+  return () => {
+    window.removeEventListener("message", handleMessage);
+  };
+}
+
 function isBridgeResponse(message: unknown): message is BridgeResponse {
   if (!message || typeof message !== "object") {
     return false;
@@ -46,4 +67,25 @@ function isBridgeResponse(message: unknown): message is BridgeResponse {
 
   const candidate = message as Partial<BridgeResponse>;
   return candidate.source === SHAME_THE_WEB_EXTENSION_SOURCE && typeof candidate.id === "string";
+}
+
+function isBridgeEvent(message: unknown): message is BridgeEvent {
+  if (!message || typeof message !== "object") {
+    return false;
+  }
+
+  const candidate = message as Partial<BridgeEvent>;
+  if (candidate.source !== SHAME_THE_WEB_EXTENSION_SOURCE || typeof candidate.event !== "string") {
+    return false;
+  }
+
+  switch (candidate.event) {
+    case "ready":
+      return typeof candidate.version === "string";
+    case "visitRecorded":
+      return !!candidate.visit && typeof candidate.visit === "object";
+    default: {
+      return false;
+    }
+  }
 }

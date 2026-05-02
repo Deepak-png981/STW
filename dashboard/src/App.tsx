@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 
-import { summarizeVisits } from "@shame-the-web/shared";
+import { EXTENSION_INSTALL_URL, summarizeVisits } from "@shame-the-web/shared";
 import type { DashboardStats, ScoreCategory, UserProfile, VisitRecord } from "@shame-the-web/shared";
 
 import { navigate, resolveAppRoute } from "./lib/app-routing";
-import { requestBridge } from "./lib/bridge";
+import { pingBridge, requestBridge, subscribeBridgeEvents } from "./lib/bridge";
 import {
   formatScore,
   formatTimestamp,
@@ -107,6 +107,7 @@ export function App() {
   const [activeUser, setActiveUser] = useState<UserProfile | null>(null);
   const [visits, setVisits] = useState<VisitRecord[]>([]);
   const [bridgeStatus, setBridgeStatus] = useState("Connecting to extension bridge...");
+  const [bridgeUnavailable, setBridgeUnavailable] = useState(false);
   const stats = summarizeVisits(visits);
   const isDashboardRoute = route === "dashboard";
   const is404Route = route === "404";
@@ -128,9 +129,28 @@ export function App() {
     }
 
     let isMounted = true;
+    const unsubscribe = subscribeBridgeEvents((event) => {
+      if (!isMounted) {
+        return;
+      }
+
+      switch (event.event) {
+        case "ready":
+          setBridgeStatus(`Extension bridge ready (v${event.version}).`);
+          return;
+        case "visitRecorded":
+          setVisits((currentVisits) => [event.visit, ...currentVisits.filter((visit) => visit.id !== event.visit.id)]);
+          return;
+        default: {
+          const exhaustiveCheck: never = event;
+          return exhaustiveCheck;
+        }
+      }
+    });
 
     async function loadDashboardData() {
       try {
+        const version = await pingBridge();
         const [sessionResponse, visitsResponse] = await Promise.all([
           requestBridge("getSession"),
           requestBridge("getVisits")
@@ -142,10 +162,16 @@ export function App() {
 
         setActiveUser(sessionResponse.data.activeUser);
         setVisits(visitsResponse.data.visits.slice().reverse());
-        setBridgeStatus("Local extension data loaded.");
+        setBridgeUnavailable(false);
+        setBridgeStatus(`Local extension data loaded (v${version}).`);
       } catch (error) {
         if (isMounted) {
-          setBridgeStatus(error instanceof Error ? error.message : "Unable to connect to extension bridge.");
+          setBridgeUnavailable(true);
+          setBridgeStatus(
+            error instanceof Error
+              ? error.message
+              : "Unable to connect to extension bridge. Install the extension to unlock local stats."
+          );
         }
       }
     }
@@ -154,6 +180,7 @@ export function App() {
 
     return () => {
       isMounted = false;
+      unsubscribe();
     };
   }, [isDashboardRoute]);
 
@@ -171,7 +198,13 @@ export function App() {
 
   return (
     <main className="page-shell dashboard-page-shell" id="top">
-      <Dashboard activeUser={activeUser} stats={stats} visits={visits} bridgeStatus={bridgeStatus} />
+      <Dashboard
+        activeUser={activeUser}
+        stats={stats}
+        visits={visits}
+        bridgeStatus={bridgeStatus}
+        bridgeUnavailable={bridgeUnavailable}
+      />
     </main>
   );
 }
@@ -276,12 +309,14 @@ function Dashboard({
   activeUser,
   stats,
   visits,
-  bridgeStatus
+  bridgeStatus,
+  bridgeUnavailable
 }: {
   activeUser: UserProfile | null;
   stats: DashboardStats;
   visits: VisitRecord[];
   bridgeStatus: string;
+  bridgeUnavailable: boolean;
 }) {
   const categoryAverages = getAverageCategoryScores(visits);
   const metrics = getAverageMetrics(visits);
@@ -309,6 +344,15 @@ function Dashboard({
                   : "Create a local profile in the extension popup, browse a few sites, and your coach will start filling this in."}
               </p>
               <p className="bridge-status">{bridgeStatus}</p>
+              {bridgeUnavailable ? (
+                <p>
+                  Extension missing?{" "}
+                  <a href={EXTENSION_INSTALL_URL} target="_blank" rel="noreferrer">
+                    Install from latest release
+                  </a>{" "}
+                  and load unpacked in Chrome developer mode.
+                </p>
+              ) : null}
             </div>
             <div className="header-actions">
               <a className="button button-dark" href="#offenders">

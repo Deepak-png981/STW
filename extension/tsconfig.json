@@ -1,14 +1,33 @@
 {
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["ES2022", "DOM"],
-    "types": ["chrome", "vitest/globals"],
-    "rootDir": "src",
+    "lib": [
+      "ES2022",
+      "DOM"
+    ],
+    "types": [
+      "chrome",
+      "vitest/globals"
+    ],
+    "rootDir": ".",
     "tsBuildInfoFile": "dist/extension.tsbuildinfo",
     "paths": {
-      "@shame-the-web/shared": ["../shared/src/index.ts"]
+      "@shame-the-web/shared": [
+        "../shared/src/index.ts"
+      ]
     }
   },
-  "include": ["src/**/*.ts"],
-  "references": [{ "path": "../shared" }]
+  "include": [
+    ".plasmo/index.d.ts",
+    "*.ts",
+    "*.tsx",
+    "contents/**/*.ts",
+    "tabs/**/*.tsx",
+    "src/**/*.ts"
+  ],
+  "references": [
+    {
+      "path": "../shared"
+    }
+  ]
 }
