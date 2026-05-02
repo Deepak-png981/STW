@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { EXTENSION_INSTALL_URL, summarizeVisits } from "@shame-the-web/shared";
 import type { DashboardStats, ScoreCategory, UserProfile, VisitRecord } from "@shame-the-web/shared";
@@ -21,15 +21,27 @@ import {
 import { HandWrittenTitle } from "./components/ui/hand-writing-text";
 import { NotFoundPage } from "./components/ui/404-page-not-found";
 
+const DASHBOARD_NAV_IDS = ["dashboard", "scores", "offenders", "education", "history"] as const;
+type DashboardNavId = (typeof DASHBOARD_NAV_IDS)[number];
+
+function isDashboardNavId(id: string): id is DashboardNavId {
+  return (DASHBOARD_NAV_IDS as readonly string[]).includes(id);
+}
+
 function Link({ href, className, children }: { href: string; className?: string; children: React.ReactNode }) {
   const isInternal = href.startsWith("/") && !href.startsWith("//");
 
   function handleClick(e: React.MouseEvent<HTMLAnchorElement>) {
     if (!isInternal) return;
     const [path, hash] = href.split("#");
+    const targetPath = path || "/";
     e.preventDefault();
-    navigate(path || "/");
+    navigate(targetPath);
     if (hash) {
+      if (targetPath === "/dashboard" && isDashboardNavId(hash)) {
+        window.history.replaceState(null, "", `#${hash}`);
+        return;
+      }
       requestAnimationFrame(() => {
         document.getElementById(hash)?.scrollIntoView({ behavior: "smooth" });
       });
@@ -328,12 +340,50 @@ function Dashboard({
   const coachGrade = getCoachGrade(stats.averageOverallScore100);
   const hasVisits = visits.length > 0;
 
+  const [activeNavId, setActiveNavId] = useState<DashboardNavId>(() => {
+    const raw = window.location.hash.slice(1);
+    return isDashboardNavId(raw) ? raw : "dashboard";
+  });
+
+  const canvasRef = useRef<HTMLDivElement>(null);
+
+  const goToPanel = useCallback((id: DashboardNavId) => {
+    setActiveNavId(id);
+    const hash = `#${id}`;
+    if (window.location.hash !== hash) {
+      window.history.replaceState(null, "", hash);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (canvasRef.current) {
+      canvasRef.current.scrollTop = 0;
+    }
+  }, [activeNavId]);
+
+  useEffect(() => {
+    function syncFromHash() {
+      const raw = window.location.hash.slice(1);
+      setActiveNavId(isDashboardNavId(raw) ? raw : "dashboard");
+    }
+
+    syncFromHash();
+    window.addEventListener("hashchange", syncFromHash);
+    window.addEventListener("popstate", syncFromHash);
+    return () => {
+      window.removeEventListener("hashchange", syncFromHash);
+      window.removeEventListener("popstate", syncFromHash);
+    };
+  }, []);
+
   return (
     <section className="dashboard-frame" id="dashboard">
       <div className="dashboard-shell">
-        <DashboardSidebar hasVisits={hasVisits} />
+        <DashboardSidebar activeNavId={activeNavId} onSelectPanel={goToPanel} />
 
-        <div className="dashboard-canvas">
+        <div ref={canvasRef} className="dashboard-canvas" role="main">
+          {activeNavId === "dashboard" ? (
+            <>
           <header className="dashboard-header">
             <div>
               <p className="eyebrow">Your web performance coach</p>
@@ -355,12 +405,12 @@ function Dashboard({
               ) : null}
             </div>
             <div className="header-actions">
-              <a className="button button-dark" href="#offenders">
+              <button type="button" className="button button-dark" onClick={() => goToPanel("offenders")}>
                 Review Worst Offender
-              </a>
-              <a className="button button-secondary" href="#education">
+              </button>
+              <button type="button" className="button button-secondary" onClick={() => goToPanel("education")}>
                 Learn Score Rules
-              </a>
+              </button>
             </div>
           </header>
 
@@ -399,16 +449,20 @@ function Dashboard({
               <p>{hasVisits ? `${getCategoryLabel(strongestCategory)} is strongest. ${getCategoryLabel(weakestCategory)} needs the coach whistle.` : "Scores by category appear after visits are recorded."}</p>
             </article>
           </section>
+            </>
+          ) : null}
 
-          <section className="section-card" id="scores">
+          {activeNavId === "scores" ? (
+            <>
+          <section className="section-card">
             <div className="section-heading">
               <div>
                 <p className="eyebrow">Score analytics</p>
                 <h2>Four ways the web can embarrass itself.</h2>
               </div>
-              <a className="button button-secondary" href="#history">
+              <button type="button" className="button button-secondary" onClick={() => goToPanel("history")}>
                 Jump to History
-              </a>
+              </button>
             </div>
             <div className="score-list">
               {categories.map((category) => (
@@ -431,19 +485,37 @@ function Dashboard({
                 </div>
               </div>
               {recentTrend.length > 0 ? (
-                <div className="trend-bars" aria-label="Recent visit scores">
-                  {recentTrend.map((point, index) => (
-                    <div className="trend-point" key={`${point.hostname}-${point.score}-${index}`}>
-                      <span
-                        aria-hidden="true"
-                        style={{ height: `${Math.max(14, getScorePercent(point.score))}%` }}
-                      />
-                      <small>{point.score}</small>
-                      <span className="sr-only">
-                        {point.hostname}: {point.score} out of 100
-                      </span>
+                <div className="trend-chart" aria-label="Recent visit scores">
+                  <div className="trend-chart-header">
+                    <span className="trend-chart-caption">
+                      Last {recentTrend.length} visits — height is score (0–100).
+                    </span>
+                    <div className="trend-chart-scale" aria-hidden="true">
+                      <span>100</span>
+                      <span>50</span>
+                      <span>0</span>
                     </div>
-                  ))}
+                  </div>
+                  <div className="trend-chart-plot">
+                    <div className="trend-bars">
+                      {recentTrend.map((point, index) => (
+                        <div className="trend-point" key={`${point.hostname}-${point.score}-${index}`}>
+                          <span
+                            aria-hidden="true"
+                            className="trend-bar-fill"
+                            style={{ height: `${Math.max(14, getScorePercent(point.score))}%` }}
+                          />
+                          <small>{point.score}</small>
+                          <span className="trend-host-abbrev" title={point.hostname}>
+                            {abbreviateHost(point.hostname)}
+                          </span>
+                          <span className="sr-only">
+                            {point.hostname}: {point.score} out of 100
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <p className="empty-copy">No score trail yet. Visit a few pages and this will turn into a tiny performance skyline.</p>
@@ -468,16 +540,19 @@ function Dashboard({
               </div>
             </article>
           </section>
+            </>
+          ) : null}
 
-          <section className="section-card" id="offenders">
+          {activeNavId === "offenders" ? (
+          <section className="section-card">
             <div className="section-heading">
               <div>
                 <p className="eyebrow">Offender leaderboard</p>
                 <h2>The sites most in need of a small public shaming.</h2>
               </div>
-              <a className="button button-dark" href="#history">
+              <button type="button" className="button button-dark" onClick={() => goToPanel("history")}>
                 Review Roast History
-              </a>
+              </button>
             </div>
             <div className="offender-list">
               {worstHosts.length > 0 ? (
@@ -502,8 +577,10 @@ function Dashboard({
               )}
             </div>
           </section>
+          ) : null}
 
-          <section className="section-card" id="education">
+          {activeNavId === "education" ? (
+          <section className="section-card">
             <div className="section-heading">
               <div>
                 <p className="eyebrow">Learn score rules</p>
@@ -521,8 +598,10 @@ function Dashboard({
               ))}
             </div>
           </section>
+          ) : null}
 
-          <section className="section-card" id="history">
+          {activeNavId === "history" ? (
+          <section className="section-card">
             <div className="section-heading">
               <div>
                 <p className="eyebrow">Roast history</p>
@@ -556,35 +635,88 @@ function Dashboard({
               )}
             </div>
           </section>
+          ) : null}
         </div>
       </div>
     </section>
   );
 }
 
-function DashboardSidebar({ hasVisits }: { hasVisits: boolean }) {
+function DashboardSidebar({
+  activeNavId,
+  onSelectPanel
+}: {
+  activeNavId: DashboardNavId;
+  onSelectPanel: (id: DashboardNavId) => void;
+}) {
   return (
     <aside className="dashboard-sidebar">
-      <div>
-        <Link className="sidebar-brand" href="/">
-          STW
-        </Link>
-        <p>Scores, roasts, and tiny performance consequences.</p>
+      <div className="dashboard-sidebar-top">
+        <div className="sidebar-header">
+          <Link className="sidebar-brand" href="/" aria-label="Shame The Web home">
+            <img src="/Logof.png" alt="" className="sidebar-brand-logo" decoding="async" />
+          </Link>
+          <p className="sidebar-tagline">Scores, roasts, and tiny performance consequences.</p>
+        </div>
+        <nav aria-label="Dashboard navigation">
+          <button
+            type="button"
+            className={activeNavId === "dashboard" ? "is-active" : undefined}
+            onClick={() => onSelectPanel("dashboard")}
+          >
+            Overview
+          </button>
+          <button
+            type="button"
+            className={activeNavId === "scores" ? "is-active" : undefined}
+            onClick={() => onSelectPanel("scores")}
+          >
+            Scores
+          </button>
+          <button
+            type="button"
+            className={activeNavId === "offenders" ? "is-active" : undefined}
+            onClick={() => onSelectPanel("offenders")}
+          >
+            Offenders
+          </button>
+          <button
+            type="button"
+            className={activeNavId === "education" ? "is-active" : undefined}
+            onClick={() => onSelectPanel("education")}
+          >
+            Education
+          </button>
+          <button
+            type="button"
+            className={activeNavId === "history" ? "is-active" : undefined}
+            onClick={() => onSelectPanel("history")}
+          >
+            History
+          </button>
+        </nav>
       </div>
-      <nav aria-label="Dashboard navigation">
-        <a href="#dashboard">Overview</a>
-        <a href="#scores">Scores</a>
-        <a href="#offenders">Offenders</a>
-        <a href="#education">Education</a>
-        <a href="#history">History</a>
-      </nav>
-      <div className="sidebar-callout">
-        <span>Coach Mode</span>
-        <p>{hasVisits ? "Watching for slow pages, weird delays, and layout chaos." : "Waiting for a few pages to judge."}</p>
-        <Link className="button button-primary" href="/">
-          Back to Landing
-        </Link>
-      </div>
+      <Link className="sidebar-back" href="/" aria-label="Back to landing page">
+        <span className="sidebar-back-icon" aria-hidden="true">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path
+              d="M10.25 5.25h-4a1 1 0 00-1 1v11.5a1 1 0 001 1h4"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <path
+              d="M15.25 12.25h6.5m0 0l-2-2m2 2l-2 2"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </span>
+        <span className="sidebar-back-text">Back</span>
+      </Link>
     </aside>
   );
 }
@@ -624,6 +756,14 @@ function ScoreRow({ label, score, copy }: { label: string; score?: number; copy:
       </div>
     </article>
   );
+}
+
+function abbreviateHost(hostname: string): string {
+  const trimmed = hostname.replace(/^www\./, "");
+  if (trimmed.length <= 10) {
+    return trimmed;
+  }
+  return `${trimmed.slice(0, 8)}…`;
 }
 
 function getCategoryByScore(categoryAverages: Record<ScoreCategory, number>, mode: "strongest" | "weakest"): ScoreCategory {
