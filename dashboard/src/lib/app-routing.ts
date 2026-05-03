@@ -1,4 +1,4 @@
-export type AppRoute = "landing" | "dashboard" | "404";
+export type AppRoute = "landing" | "dashboard" | "privacy" | "404";
 
 export function navigate(path: string): void {
   window.history.pushState({}, "", path);
@@ -10,6 +10,10 @@ export function resolveAppRoute(pathname: string): AppRoute {
 
   if (normalizedPath === "/dashboard") {
     return "dashboard";
+  }
+
+  if (normalizedPath === "/privacy") {
+    return "privacy";
   }
 
   if (normalizedPath === "/" || normalizedPath === "") {

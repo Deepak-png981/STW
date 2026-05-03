@@ -21,6 +21,7 @@ import {
 import { HandWrittenTitle } from "./components/ui/hand-writing-text";
 import { NotFoundPage } from "./components/ui/404-page-not-found";
 import { KnowledgeGraphPanel } from "./components/KnowledgeGraphPanel";
+import { PrivacyPage } from "./pages/Privacy";
 
 const DASHBOARD_NAV_IDS = ["dashboard", "scores", "offenders", "education", "history", "knowledge"] as const;
 type DashboardNavId = (typeof DASHBOARD_NAV_IDS)[number];
@@ -210,6 +211,15 @@ export function App() {
 
   if (is404Route) {
     return <NotFoundPage />;
+  }
+
+  if (route === "privacy") {
+    return (
+      <main className="page-shell landing-page-shell" id="top">
+        <PrivacyPage />
+        <SiteFooter />
+      </main>
+    );
   }
 
   if (!isDashboardRoute) {
