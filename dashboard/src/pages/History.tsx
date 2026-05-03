@@ -4,6 +4,14 @@ type HistoryProps = {
   visits: VisitRecord[];
 };
 
+function getDisplayTitle(visit: VisitRecord): string {
+  const t = visit.title?.trim();
+  if (t && t.toLowerCase() !== visit.hostname.toLowerCase()) {
+    return t;
+  }
+  return visit.hostname;
+}
+
 export function History({ visits }: HistoryProps) {
   if (visits.length === 0) {
     return (
@@ -18,15 +26,20 @@ export function History({ visits }: HistoryProps) {
     <section className="card">
       <h2>Visit history</h2>
       <div className="history-list">
-        {visits.map((visit) => (
-          <article className="history-item" key={visit.id}>
-            <div>
-              <strong>{visit.hostname}</strong>
-              <p>{visit.roast.message}</p>
-            </div>
-            <span>{visit.speedScore100}/100</span>
-          </article>
-        ))}
+        {visits.map((visit) => {
+          const title = getDisplayTitle(visit);
+          const showHost = title !== visit.hostname;
+          return (
+            <article className="history-item" key={visit.id}>
+              <div className="history-item__text">
+                <strong title={visit.url}>{title}</strong>
+                {showHost ? <span className="history-item__host">{visit.hostname}</span> : null}
+                <p>{visit.roast.message}</p>
+              </div>
+              <span>{visit.speedScore100}/100</span>
+            </article>
+          );
+        })}
       </div>
     </section>
   );

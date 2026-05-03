@@ -4,13 +4,15 @@ import type { BridgeEvent, BridgeRequest, BridgeResponse } from "@shame-the-web/
 const REQUEST_TIMEOUT_MS = 1500;
 
 export async function requestBridge<T extends BridgeRequest["type"]>(
-  type: T
+  type: T,
+  extra?: Record<string, unknown>
 ): Promise<Extract<BridgeResponse, { ok: true; type: T }>> {
-  const request: BridgeRequest = {
+  const request = {
     id: globalThis.crypto.randomUUID(),
     source: SHAME_THE_WEB_BRIDGE_SOURCE,
-    type
-  };
+    type,
+    ...extra
+  } as BridgeRequest;
 
   return new Promise((resolve, reject) => {
     const timeout = window.setTimeout(() => {
@@ -74,18 +76,19 @@ function isBridgeEvent(message: unknown): message is BridgeEvent {
     return false;
   }
 
-  const candidate = message as Partial<BridgeEvent>;
-  if (candidate.source !== SHAME_THE_WEB_EXTENSION_SOURCE || typeof candidate.event !== "string") {
+  const candidate = message as Record<string, unknown>;
+  if (candidate["source"] !== SHAME_THE_WEB_EXTENSION_SOURCE || typeof candidate["event"] !== "string") {
     return false;
   }
 
-  switch (candidate.event) {
+  switch (candidate["event"]) {
     case "ready":
-      return typeof candidate.version === "string";
+      return typeof candidate["version"] === "string";
     case "visitRecorded":
-      return !!candidate.visit && typeof candidate.visit === "object";
-    default: {
+      return !!candidate["visit"] && typeof candidate["visit"] === "object";
+    case "graphUpdated":
+      return typeof candidate["nodeCount"] === "number";
+    default:
       return false;
-    }
   }
 }

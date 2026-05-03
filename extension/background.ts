@@ -6,6 +6,15 @@ import type { BridgeRequest, BridgeResponse, ScoreBand, VisitRecord } from "@sha
 
 import { handleBridgeRequest } from "./src/background/bridge-handler";
 import { appendVisit, chromeStorageDriver, getState, rememberRoastTemplate } from "./src/lib/storage";
+import { buildKnowledgeGraph } from "./src/lib/graph-builder";
+import {
+  getAllPageContents,
+  getStoredKnowledgeGraph,
+  storeKnowledgeGraph,
+  storePageContent
+} from "./src/lib/content-storage";
+import { searchPages } from "./src/lib/tfidf";
+import type { RawPageContent } from "./src/lib/content-extractor";
 
 type RecordVisitMessage = {
   type: "recordVisit";
@@ -16,7 +25,37 @@ type RecordVisitMessage = {
   };
 };
 
-type RuntimeMessage = BridgeRequest | RecordVisitMessage;
+type StorePageContentMessage = {
+  type: "storePageContent";
+  content: RawPageContent;
+};
+
+type RuntimeMessage = BridgeRequest | RecordVisitMessage | StorePageContentMessage;
+
+let rebuildTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleGraphRebuild(): void {
+  if (rebuildTimer !== null) {
+    clearTimeout(rebuildTimer);
+  }
+  console.log("[STW] background: graph rebuild scheduled in 5s");
+  rebuildTimer = setTimeout(() => {
+    rebuildTimer = null;
+    void (async () => {
+      try {
+        const [pages, state] = await Promise.all([getAllPageContents(), getState(chromeStorageDriver)]);
+        console.log("[STW] background: rebuilding graph from", pages.length, "pages");
+        const graph = buildKnowledgeGraph(pages, state.visits);
+        console.log("[STW] background: graph built —", graph.nodes.length, "nodes,", graph.edges.length, "edges");
+        await storeKnowledgeGraph(graph);
+        console.log("[STW] background: graph stored in IndexedDB");
+        void broadcastGraphUpdated(graph.nodes.length);
+      } catch (err) {
+        console.error("[STW] background: graph rebuild FAILED", err);
+      }
+    })();
+  }, 5000);
+}
 
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason !== "install") {
@@ -27,11 +66,14 @@ chrome.runtime.onInstalled.addListener((details) => {
 });
 
 chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendResponse) => {
+  console.log("[STW] background: received message type =", message.type);
   void handleRuntimeMessage(message, sender)
     .then((response) => {
+      console.log("[STW] background: responding to", message.type, "ok =", (response as { ok?: boolean }).ok);
       sendResponse(response);
     })
     .catch((error: unknown) => {
+      console.error("[STW] background: handler threw for", message.type, error);
       sendResponse(
         createBridgeErrorResponse(
           message,
@@ -59,8 +101,76 @@ async function handleRuntimeMessage(
     return { ok: true };
   }
 
+  if (message.type === "storePageContent") {
+    console.log("[STW] background: storing page content for", message.content.url);
+    try {
+      await storePageContent(message.content);
+      console.log("[STW] background: page content stored OK");
+    } catch (err) {
+      console.error("[STW] background: storePageContent FAILED", err);
+      throw err;
+    }
+    scheduleGraphRebuild();
+    return { ok: true };
+  }
+
+  if (message.type === "getKnowledgeGraph") {
+    console.log("[STW] background: getKnowledgeGraph requested");
+    let graph = await getStoredKnowledgeGraph();
+    if (!graph) {
+      console.log("[STW] background: no cached graph, building now…");
+      const [pages, state] = await Promise.all([getAllPageContents(), getState(chromeStorageDriver)]);
+      console.log("[STW] background: building from", pages.length, "pages");
+      graph = buildKnowledgeGraph(pages, state.visits);
+      await storeKnowledgeGraph(graph);
+    }
+    console.log("[STW] background: returning graph with", graph.nodes.length, "nodes,", graph.edges.length, "edges");
+    return {
+      id: message.id,
+      source: SHAME_THE_WEB_EXTENSION_SOURCE,
+      ok: true,
+      type: "getKnowledgeGraph",
+      data: { graph }
+    };
+  }
+
+  if (message.type === "searchKnowledge") {
+    console.log("[STW] background: searchKnowledge query =", message.query);
+    const pages = await getAllPageContents();
+    console.log("[STW] background: searching across", pages.length, "pages");
+    const results = searchPages(message.query, pages);
+    console.log("[STW] background: search returned", results.length, "results");
+    return {
+      id: message.id,
+      source: SHAME_THE_WEB_EXTENSION_SOURCE,
+      ok: true,
+      type: "searchKnowledge",
+      data: { results }
+    };
+  }
+
   const state = await getState(chromeStorageDriver);
   return handleBridgeRequest(message, state);
+}
+
+async function broadcastGraphUpdated(nodeCount: number): Promise<void> {
+  const tabs = await chrome.tabs.query({});
+
+  await Promise.all(
+    tabs
+      .filter((tab) => tab.id !== undefined && matchesDashboardOrigin(tab.url))
+      .map(async (tab) => {
+        try {
+          await chrome.tabs.sendMessage(tab.id as number, {
+            source: SHAME_THE_WEB_EXTENSION_SOURCE,
+            event: "graphUpdated",
+            nodeCount
+          });
+        } catch {
+          // Dashboard tab may not have the content script ready; swallow silently.
+        }
+      })
+  );
 }
 
 async function broadcastVisitRecorded(visit: VisitRecord, sourceTabId?: number): Promise<void> {

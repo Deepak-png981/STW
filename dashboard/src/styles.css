@@ -124,7 +124,11 @@ p {
 }
 
 .landing-page-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
   max-width: 1480px;
+  min-height: 100vh;
 }
 
 .dashboard-page-shell {
@@ -139,6 +143,18 @@ p {
 .dashboard-page-shell > .dashboard-frame {
   flex: 1 1 auto;
   min-height: 0;
+}
+
+.site-footer {
+  margin-top: auto;
+  padding-top: 0.25rem;
+  text-align: center;
+}
+
+.site-footer p {
+  color: var(--stw-text-muted, var(--stw-text-secondary-light));
+  font-size: 0.8125rem;
+  margin: 0;
 }
 
 .landing {
@@ -1369,6 +1385,21 @@ p {
   margin-top: 0.6rem;
 }
 
+.history-item h3 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-host-line {
+  color: #6f7280 !important;
+  font-size: 0.72rem !important;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  margin-top: 0.15rem !important;
+  text-transform: lowercase;
+}
+
 .history-score {
   display: grid;
   gap: 0.3rem;
@@ -1542,6 +1573,390 @@ p {
 
   .history-score {
     justify-items: start;
+  }
+}
+
+/* ── Knowledge Graph Panel (GitNexus-inspired dark neon) ─────── */
+
+.knowledge-graph-section {
+  padding: 2rem;
+}
+
+/* Scoped dark “Nexus” theme — does not affect other dashboard cards */
+.knowledge-graph-nexus.section-card {
+  background: linear-gradient(165deg, #0c0c10 0%, #0a0a0e 45%, #0f0f14 100%);
+  border: 1px solid rgba(34, 211, 238, 0.18);
+  box-shadow:
+    0 0 0 1px rgba(168, 85, 252, 0.12) inset,
+    0 24px 48px rgba(0, 0, 0, 0.45);
+}
+
+.knowledge-graph-nexus-heading {
+  align-items: flex-start;
+}
+
+.knowledge-graph-nexus-heading .knowledge-graph-eyebrow {
+  color: #22d3ee;
+  letter-spacing: 0.12em;
+}
+
+.knowledge-graph-title {
+  background: linear-gradient(90deg, #f1f5f9 0%, #cbd5e1 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.knowledge-graph-heading-tools {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  text-align: right;
+}
+
+.knowledge-graph-meta {
+  color: #64748b !important;
+  font-size: 0.78rem !important;
+  font-weight: 600;
+  margin: 0;
+}
+
+.knowledge-graph-label-toggle {
+  align-items: center;
+  color: #94a3b8;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.75rem;
+  font-weight: 600;
+  gap: 0.45rem;
+  user-select: none;
+}
+
+.knowledge-graph-label-toggle input {
+  accent-color: #22d3ee;
+  cursor: pointer;
+  height: 0.95rem;
+  margin: 0;
+  width: 0.95rem;
+}
+
+.knowledge-graph-label-toggle span {
+  letter-spacing: 0.02em;
+}
+
+.knowledge-graph-layout {
+  display: grid;
+  gap: 1.5rem;
+  grid-template-columns: 1fr 340px;
+  margin-top: 1.5rem;
+  min-height: 520px;
+}
+
+.knowledge-graph-container {
+  border-radius: 14px;
+  min-height: 480px;
+  overflow: hidden;
+  position: relative;
+}
+
+.knowledge-graph-canvas-wrap {
+  background: #050508;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  box-shadow:
+    0 0 80px rgba(34, 211, 238, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.knowledge-graph-canvas-wrap::before {
+  background-image:
+    radial-gradient(ellipse 70% 55% at 50% 35%, rgba(34, 211, 238, 0.09), transparent 65%),
+    linear-gradient(rgba(51, 65, 85, 0.35) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(51, 65, 85, 0.35) 1px, transparent 1px);
+  background-size: 100% 100%, 28px 28px, 28px 28px;
+  content: "";
+  inset: 0;
+  opacity: 0.9;
+  pointer-events: none;
+  position: absolute;
+  z-index: 0;
+}
+
+.knowledge-graph-canvas--sigma {
+  height: 100%;
+  left: 0;
+  min-height: 480px;
+  position: absolute;
+  top: 0;
+  width: 100%;
+  z-index: 1;
+}
+
+.knowledge-graph-canvas {
+  height: 100%;
+  left: 0;
+  min-height: 480px;
+  position: absolute;
+  top: 0;
+  width: 100%;
+}
+
+.knowledge-graph-empty {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  height: 100%;
+  justify-content: center;
+  min-height: 480px;
+  padding: 2rem;
+  position: relative;
+  text-align: center;
+  z-index: 1;
+}
+
+.knowledge-graph-empty--nexus {
+  color: #94a3b8;
+}
+
+.knowledge-graph-empty--nexus strong {
+  color: #e2e8f0;
+  font-size: 1.1rem;
+}
+
+.knowledge-graph-empty--nexus p {
+  font-size: 0.92rem;
+  line-height: 1.5;
+  max-width: 36ch;
+}
+
+.knowledge-graph-tooltip--nexus {
+  backdrop-filter: blur(10px);
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(34, 211, 238, 0.35);
+  border-radius: 12px;
+  bottom: 1rem;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5), 0 0 24px rgba(34, 211, 238, 0.12);
+  color: #f1f5f9;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  left: 1rem;
+  max-width: 280px;
+  padding: 1rem 1.1rem;
+  pointer-events: auto;
+  position: absolute;
+  z-index: 2;
+}
+
+.knowledge-graph-tooltip--nexus strong {
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.knowledge-tooltip-host {
+  color: #22d3ee;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.knowledge-tooltip-meta {
+  color: #94a3b8;
+  font-size: 0.75rem;
+}
+
+.knowledge-tooltip-keywords {
+  color: #64748b;
+  font-size: 0.72rem;
+  line-height: 1.4;
+  margin-top: 0.2rem;
+}
+
+.knowledge-tooltip-path {
+  color: #475569;
+  font-family: ui-monospace, "Cascadia Code", "Fira Mono", monospace;
+  font-size: 0.67rem;
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledge-graph-open-btn {
+  background: linear-gradient(135deg, #22d3ee 0%, #a855f7 100%);
+  border: none;
+  color: #0f172a !important;
+  font-size: 0.8rem;
+  font-weight: 700;
+  margin-top: 0.4rem;
+  padding: 0.45rem 0.9rem;
+}
+
+.knowledge-graph-open-btn:hover {
+  filter: brightness(1.08);
+}
+
+/* ── Search Panel (Nexus) ────────────────────────────────────── */
+
+.knowledge-search-panel--nexus {
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow: hidden;
+  padding: 1.25rem;
+}
+
+.knowledge-search-panel .knowledge-search-heading {
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.knowledge-search-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.knowledge-search-input--nexus {
+  background: rgba(15, 23, 42, 0.9);
+  border: 1px solid rgba(34, 211, 238, 0.25);
+  border-radius: 10px;
+  color: #e2e8f0;
+  flex: 1;
+  font-family: inherit;
+  font-size: 0.9rem;
+  outline: none;
+  padding: 0.6rem 0.9rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.knowledge-search-input--nexus::placeholder {
+  color: #475569;
+}
+
+.knowledge-search-input--nexus:focus {
+  border-color: #22d3ee;
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.15);
+}
+
+.knowledge-graph-find-btn {
+  background: linear-gradient(135deg, #22d3ee 0%, #0891b2 100%);
+  border: none;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.knowledge-graph-find-btn:disabled {
+  opacity: 0.45;
+}
+
+.knowledge-search-results {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 0.75rem;
+  overflow-y: auto;
+}
+
+.knowledge-result-card--nexus {
+  background: rgba(15, 23, 42, 0.75);
+  border: 1px solid rgba(100, 116, 139, 0.25);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 0.85rem 1rem;
+}
+
+.knowledge-result-header {
+  align-items: center;
+  display: flex;
+  gap: 0.6rem;
+}
+
+.knowledge-result-favicon {
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.knowledge-result-meta {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.knowledge-result-meta strong {
+  color: #f1f5f9;
+  display: block;
+  font-size: 0.88rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledge-result-meta span {
+  color: #94a3b8;
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledge-result-open {
+  background: rgba(34, 211, 238, 0.15);
+  border: 1px solid rgba(34, 211, 238, 0.4);
+  color: #22d3ee !important;
+  flex-shrink: 0;
+  font-size: 0.78rem;
+  padding: 0.35rem 0.7rem;
+}
+
+.knowledge-result-snippet {
+  color: #94a3b8;
+  font-size: 0.8rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.knowledge-result-date {
+  color: #64748b;
+  font-size: 0.72rem;
+}
+
+.knowledge-result-path {
+  color: #475569;
+  font-family: ui-monospace, "Cascadia Code", "Fira Mono", monospace;
+  font-size: 0.67rem;
+  letter-spacing: 0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.knowledge-empty-copy {
+  color: #64748b;
+}
+
+@media (max-width: 900px) {
+  .knowledge-graph-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .knowledge-graph-container,
+  .knowledge-graph-canvas,
+  .knowledge-graph-empty {
+    min-height: 340px;
   }
 }
 

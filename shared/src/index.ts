@@ -1,5 +1,47 @@
 export const SHAME_THE_WEB_BRIDGE_SOURCE = "shame-the-web-dashboard" as const;
 export const SHAME_THE_WEB_EXTENSION_SOURCE = "shame-the-web-extension" as const;
+
+export type PageContent = {
+  url: string;
+  title: string;
+  description: string;
+  headings: string[];
+  bodyText: string;
+  keywords: string[];
+  visitedAt: string;
+};
+
+export type KnowledgeNode = {
+  id: string;
+  label: string;
+  hostname: string;
+  url: string;
+  keywords: string[];
+  visitCount: number;
+  lastVisited: string;
+  clusterId: number;
+};
+
+export type KnowledgeEdge = {
+  source: string;
+  target: string;
+  weight: number;
+};
+
+export type KnowledgeGraph = {
+  nodes: KnowledgeNode[];
+  edges: KnowledgeEdge[];
+  builtAt: string;
+};
+
+export type KnowledgeSearchResult = {
+  url: string;
+  title: string;
+  hostname: string;
+  lastVisited: string;
+  snippet: string;
+  score: number;
+};
 export const EXTENSION_INSTALL_URL =
   "https://github.com/deepak-io/shame_the_web/releases/latest" as const;
 
@@ -69,7 +111,9 @@ export type BridgeRequest =
   | { id: string; source: typeof SHAME_THE_WEB_BRIDGE_SOURCE; type: "getSession" }
   | { id: string; source: typeof SHAME_THE_WEB_BRIDGE_SOURCE; type: "getVisits" }
   | { id: string; source: typeof SHAME_THE_WEB_BRIDGE_SOURCE; type: "getStats" }
-  | { id: string; source: typeof SHAME_THE_WEB_BRIDGE_SOURCE; type: "getRoasts" };
+  | { id: string; source: typeof SHAME_THE_WEB_BRIDGE_SOURCE; type: "getRoasts" }
+  | { id: string; source: typeof SHAME_THE_WEB_BRIDGE_SOURCE; type: "getKnowledgeGraph" }
+  | { id: string; source: typeof SHAME_THE_WEB_BRIDGE_SOURCE; type: "searchKnowledge"; query: string };
 
 export type BridgeEvent =
   | {
@@ -81,6 +125,11 @@ export type BridgeEvent =
       source: typeof SHAME_THE_WEB_EXTENSION_SOURCE;
       event: "visitRecorded";
       visit: VisitRecord;
+    }
+  | {
+      source: typeof SHAME_THE_WEB_EXTENSION_SOURCE;
+      event: "graphUpdated";
+      nodeCount: number;
     };
 
 export type BridgeResponse =
@@ -118,6 +167,20 @@ export type BridgeResponse =
       ok: true;
       type: "getRoasts";
       data: { visits: VisitRecord[] };
+    }
+  | {
+      id: string;
+      source: typeof SHAME_THE_WEB_EXTENSION_SOURCE;
+      ok: true;
+      type: "getKnowledgeGraph";
+      data: { graph: KnowledgeGraph };
+    }
+  | {
+      id: string;
+      source: typeof SHAME_THE_WEB_EXTENSION_SOURCE;
+      ok: true;
+      type: "searchKnowledge";
+      data: { results: KnowledgeSearchResult[] };
     }
   | {
       id: string;

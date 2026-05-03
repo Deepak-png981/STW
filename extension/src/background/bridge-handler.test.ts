@@ -5,12 +5,14 @@ import type { BridgeRequest, StoredState } from "@shame-the-web/shared";
 
 import { handleBridgeRequest } from "./bridge-handler";
 
-function request(type: BridgeRequest["type"]): BridgeRequest {
+type SimpleRequestType = Exclude<BridgeRequest["type"], "searchKnowledge">;
+
+function request(type: SimpleRequestType): BridgeRequest {
   return {
     id: `request-${type}`,
     source: SHAME_THE_WEB_BRIDGE_SOURCE,
     type
-  };
+  } as BridgeRequest;
 }
 
 const state: StoredState = {

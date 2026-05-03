@@ -2,17 +2,102 @@ import {
   SHAME_THE_WEB_BRIDGE_SOURCE,
   SHAME_THE_WEB_EXTENSION_SOURCE
 } from "@shame-the-web/shared";
-import type { BridgeRequest, BridgeResponse } from "@shame-the-web/shared";
+import type { BridgeRequest, BridgeResponse, VisitRecord } from "@shame-the-web/shared";
+
+type BridgePushVisitRecorded = {
+  source: typeof SHAME_THE_WEB_EXTENSION_SOURCE;
+  event: "visitRecorded";
+  visit: VisitRecord;
+};
+
+const CONTEXT_INVALID_HINT =
+  "Extension was updated or reloaded. Refresh this page to reconnect.";
 
 window.addEventListener("message", (event: MessageEvent<unknown>) => {
   if (event.source !== window || !isDashboardRequest(event.data)) {
     return;
   }
 
-  void chrome.runtime.sendMessage(event.data, (response: BridgeResponse) => {
-    window.postMessage(response, window.location.origin);
-  });
+  const request = event.data;
+
+  if (!isExtensionContextValid()) {
+    window.postMessage(bridgeErrorResponse(request, CONTEXT_INVALID_HINT), window.location.origin);
+    return;
+  }
+
+  try {
+    chrome.runtime.sendMessage(request, (response: BridgeResponse | undefined) => {
+      const lastError = chrome.runtime.lastError;
+      if (lastError?.message) {
+        const errorText = isContextInvalidatedMessage(lastError.message)
+          ? CONTEXT_INVALID_HINT
+          : lastError.message;
+        window.postMessage(bridgeErrorResponse(request, errorText), window.location.origin);
+        return;
+      }
+      if (response) {
+        window.postMessage(response, window.location.origin);
+      }
+    });
+  } catch (err) {
+    const message =
+      err instanceof Error && isContextInvalidatedMessage(err.message)
+        ? CONTEXT_INVALID_HINT
+        : err instanceof Error
+          ? err.message
+          : "Extension bridge error.";
+    window.postMessage(bridgeErrorResponse(request, message), window.location.origin);
+  }
 });
+
+chrome.runtime.onMessage.addListener((message: unknown) => {
+  if (!isExtensionContextValid()) {
+    return;
+  }
+
+  if (!isBridgePushVisitRecorded(message)) {
+    return;
+  }
+
+  window.postMessage(message, window.location.origin);
+});
+
+if (isExtensionContextValid()) {
+  try {
+    window.postMessage(
+      {
+        source: SHAME_THE_WEB_EXTENSION_SOURCE,
+        event: "ready",
+        version: chrome.runtime.getManifest().version
+      },
+      window.location.origin
+    );
+  } catch {
+    // Context can invalidate between check and getManifest/postMessage.
+  }
+}
+
+function isExtensionContextValid(): boolean {
+  try {
+    return Boolean(chrome.runtime?.id);
+  } catch {
+    return false;
+  }
+}
+
+function isContextInvalidatedMessage(text: string): boolean {
+  return text.includes("Extension context invalidated");
+}
+
+function bridgeErrorResponse(request: BridgeRequest, error: string): BridgeResponse {
+  return {
+    id: request.id,
+    source: SHAME_THE_WEB_EXTENSION_SOURCE,
+    ok: false,
+    type: request.type,
+    error
+  };
+}
 
 function isDashboardRequest(message: unknown): message is BridgeRequest {
   if (!message || typeof message !== "object") {
@@ -27,17 +112,22 @@ function isDashboardRequest(message: unknown): message is BridgeRequest {
       candidate.type === "getSession" ||
       candidate.type === "getVisits" ||
       candidate.type === "getStats" ||
-      candidate.type === "getRoasts")
+      candidate.type === "getRoasts" ||
+      candidate.type === "getKnowledgeGraph" ||
+      (candidate.type === "searchKnowledge" && typeof (candidate as { query?: unknown }).query === "string"))
   );
 }
 
-window.postMessage(
-  {
-    id: "bridge-ready",
-    source: SHAME_THE_WEB_EXTENSION_SOURCE,
-    ok: true,
-    type: "getSession",
-    data: { activeUser: null }
-  } satisfies BridgeResponse,
-  window.location.origin
-);
+function isBridgePushVisitRecorded(message: unknown): message is BridgePushVisitRecorded {
+  if (!message || typeof message !== "object") {
+    return false;
+  }
+
+  const candidate = message as Partial<BridgePushVisitRecorded>;
+  return (
+    candidate.source === SHAME_THE_WEB_EXTENSION_SOURCE &&
+    candidate.event === "visitRecorded" &&
+    !!candidate.visit &&
+    typeof candidate.visit === "object"
+  );
+}

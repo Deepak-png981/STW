@@ -20,12 +20,21 @@ import {
 
 import { HandWrittenTitle } from "./components/ui/hand-writing-text";
 import { NotFoundPage } from "./components/ui/404-page-not-found";
+import { KnowledgeGraphPanel } from "./components/KnowledgeGraphPanel";
 
-const DASHBOARD_NAV_IDS = ["dashboard", "scores", "offenders", "education", "history"] as const;
+const DASHBOARD_NAV_IDS = ["dashboard", "scores", "offenders", "education", "history", "knowledge"] as const;
 type DashboardNavId = (typeof DASHBOARD_NAV_IDS)[number];
 
 function isDashboardNavId(id: string): id is DashboardNavId {
   return (DASHBOARD_NAV_IDS as readonly string[]).includes(id);
+}
+
+function SiteFooter() {
+  return (
+    <footer className="site-footer">
+      <p>© 2026 ShameTheWeb. All rights reserved.</p>
+    </footer>
+  );
 }
 
 function Link({ href, className, children }: { href: string; className?: string; children: React.ReactNode }) {
@@ -204,6 +213,7 @@ export function App() {
     return (
       <main className="page-shell landing-page-shell" id="top">
         <LandingPage />
+        <SiteFooter />
       </main>
     );
   }
@@ -303,14 +313,14 @@ function LandingPage() {
         </div>
         <div className="trust-meta">
           <span className="status-bar">Local-first experience</span>
-          <a
+          {/* <a
             className="author-link"
             href="https://www.linkedin.com/in/deepak-joshi-software-engineer/"
             target="_blank"
             rel="noreferrer"
           >
             Author: Deepak Joshi
-          </a>
+          </a> */}
         </div>
       </section>
     </section>
@@ -610,23 +620,32 @@ function Dashboard({
             </div>
             <div className="history-list">
               {visits.length > 0 ? (
-                visits.slice(0, 10).map((visit) => (
-                  <article className="history-item" key={visit.id}>
-                    <div>
-                      <h3>{visit.hostname}</h3>
-                      <p>{visit.roast.message}</p>
-                      <small>
-                        {visit.categoryScores
-                          .map((score) => `${getCategoryLabel(score.category)}: ${score.score100}`)
-                          .join(" | ")}
-                      </small>
-                    </div>
-                    <div className="history-score">
-                      <strong>{formatScore(visit.overallScore100)}</strong>
-                      <span>{formatTimestamp(visit.timestamp)}</span>
-                    </div>
-                  </article>
-                ))
+                visits.slice(0, 10).map((visit) => {
+                  const visitTitle = (visit.title ?? "").trim();
+                  const showTitle =
+                    visitTitle && visitTitle.toLowerCase() !== visit.hostname.toLowerCase()
+                      ? visitTitle
+                      : visit.hostname;
+                  const hostBelow = showTitle !== visit.hostname;
+                  return (
+                    <article className="history-item" key={visit.id}>
+                      <div>
+                        <h3 title={visit.url}>{showTitle}</h3>
+                        {hostBelow ? <small className="history-host-line">{visit.hostname}</small> : null}
+                        <p>{visit.roast.message}</p>
+                        <small>
+                          {visit.categoryScores
+                            .map((score) => `${getCategoryLabel(score.category)}: ${score.score100}`)
+                            .join(" | ")}
+                        </small>
+                      </div>
+                      <div className="history-score">
+                        <strong>{formatScore(visit.overallScore100)}</strong>
+                        <span>{formatTimestamp(visit.timestamp)}</span>
+                      </div>
+                    </article>
+                  );
+                })
               ) : (
                 <p className="empty-copy">
                   Once you browse with a local profile active, recent visits will appear here with scores, roasts,
@@ -636,6 +655,8 @@ function Dashboard({
             </div>
           </section>
           ) : null}
+
+          {activeNavId === "knowledge" ? <KnowledgeGraphPanel /> : null}
         </div>
       </div>
     </section>
@@ -693,6 +714,13 @@ function DashboardSidebar({
             onClick={() => onSelectPanel("history")}
           >
             History
+          </button>
+          <button
+            type="button"
+            className={activeNavId === "knowledge" ? "is-active" : undefined}
+            onClick={() => onSelectPanel("knowledge")}
+          >
+            Knowledge
           </button>
         </nav>
       </div>

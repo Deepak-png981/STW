@@ -60,9 +60,21 @@ export function handleBridgeRequest(message: unknown, state: StoredState): Bridg
         type: "getRoasts",
         data: { visits }
       };
+    // These two types are intercepted in background.ts before reaching here.
+    // The cases exist only to satisfy TypeScript exhaustiveness.
+    case "getKnowledgeGraph":
+    case "searchKnowledge":
+      return {
+        id: message.id,
+        source: SHAME_THE_WEB_EXTENSION_SOURCE,
+        ok: false,
+        type: message.type,
+        error: "Unexpected synchronous dispatch of async request."
+      };
     default: {
-      const exhaustiveCheck: never = message.type;
-      return exhaustiveCheck;
+      // TypeScript 6: access on `never` is an error, so assign `message` directly.
+      const exhaustiveCheck: never = message;
+      return exhaustiveCheck as unknown as BridgeResponse;
     }
   }
 }
@@ -85,6 +97,8 @@ function isBridgeRequest(message: unknown): message is BridgeRequest {
       candidate.type === "getSession" ||
       candidate.type === "getVisits" ||
       candidate.type === "getStats" ||
-      candidate.type === "getRoasts")
+      candidate.type === "getRoasts" ||
+      candidate.type === "getKnowledgeGraph" ||
+      candidate.type === "searchKnowledge")
   );
 }
