@@ -95,6 +95,7 @@ export type StoredState = {
   activeUserId: string | null;
   visits: VisitRecord[];
   recentRoastTemplateIds: Record<string, string[]>;
+  toastEnabled: boolean;
 };
 
 export type DashboardStats = {

@@ -2,7 +2,7 @@ import type { PlasmoCSConfig } from "plasmo";
 
 import { getRoastCategory, pickRoast } from "../lib/roast-templates";
 import { calculateScores, collectPageMetrics, createVisitRecord } from "../lib/scoring";
-import { chromeStorageDriver, getActiveUser, getRecentRoastTemplateIds } from "../lib/storage";
+import { chromeStorageDriver, getRecentRoastTemplateIds, getState } from "../lib/storage";
 import { renderRoastToast, shouldShowToast } from "../content/toast";
 import { extractPageContent } from "../lib/content-extractor";
 import type { RawPageContent } from "../lib/content-extractor";
@@ -85,10 +85,12 @@ export async function runPageRoast() {
   const urlAtStart = window.location.href;
   const titleAtStart = (typeof document !== "undefined" ? document.title : "") || window.location.hostname;
 
-  const activeUser = await getActiveUser(chromeStorageDriver);
+  const state = await getState(chromeStorageDriver);
+  const activeUser = state.users.find((u) => u.id === state.activeUserId) ?? null;
   if (!activeUser) {
     return;
   }
+  const toastEnabled = state.toastEnabled;
 
   // If the user navigated away while we were fetching the active user, abort.
   if (window.location.href !== urlAtStart) {
@@ -134,11 +136,13 @@ export async function runPageRoast() {
     return;
   }
 
-  renderRoastToast({
-    message: roast.message,
-    subline: roast.subline,
-    durationMs: 2500
-  });
+  if (toastEnabled) {
+    renderRoastToast({
+      message: roast.message,
+      subline: roast.subline,
+      durationMs: 2500
+    });
+  }
 
   void indexCurrentPage(urlAtStart);
 }

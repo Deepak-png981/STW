@@ -5,7 +5,7 @@ import type { UserProfile, VisitRecord } from "@shame-the-web/shared";
 import { designTokensAsCssVariables } from "@shame-the-web/shared";
 import brandLogoUrl from "url:../dashboard/public/Tlogo.png";
 
-import { chromeStorageDriver, createUser, getActiveUser, getState, loginUser } from "./src/lib/storage";
+import { chromeStorageDriver, createUser, getActiveUser, getState, loginUser, setToastEnabled } from "./src/lib/storage";
 import { getSiteDisplayName } from "./src/lib/site-display-name";
 
 const dashboardBaseUrl = process.env.PLASMO_PUBLIC_DASHBOARD_URL ?? "https://shametheweb.com";
@@ -14,6 +14,7 @@ export default function Popup() {
   const [loading, setLoading] = useState(true);
   const [activeUser, setActiveUser] = useState<UserProfile | null>(null);
   const [visits, setVisits] = useState<VisitRecord[]>([]);
+  const [toastEnabled, setToastEnabledState] = useState(true);
   const [error, setError] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -33,7 +34,14 @@ export default function Popup() {
     setVisits(
       nextActiveUser ? state.visits.filter((visit) => visit.userId === nextActiveUser.id) : []
     );
+    setToastEnabledState(state.toastEnabled);
     setLoading(false);
+  }
+
+  async function handleToggleToast() {
+    const next = !toastEnabled;
+    setToastEnabledState(next);
+    await setToastEnabled(chromeStorageDriver, next);
   }
 
   async function handleAuthSubmit(event: FormEvent<HTMLFormElement>) {
@@ -126,6 +134,19 @@ export default function Popup() {
               </ul>
             </section>
           ) : null}
+          <div className="stw-settings-row">
+            <span className="stw-settings-label">Page toasts</span>
+            <button
+              className={`stw-toggle${toastEnabled ? " stw-toggle--on" : ""}`}
+              type="button"
+              role="switch"
+              aria-checked={toastEnabled}
+              aria-label="Toggle page toasts"
+              onClick={handleToggleToast}
+            >
+              <span className="stw-toggle-thumb" aria-hidden />
+            </button>
+          </div>
           <button className="stw-button stw-button-primary" type="button" onClick={openDashboard}>
             Open dashboard
           </button>
@@ -529,5 +550,55 @@ body {
   color: #b91c1c;
   margin: 0;
   min-height: 18px;
+}
+
+.stw-settings-row {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  padding: 0.25rem 0;
+}
+
+.stw-settings-label {
+  color: var(--stw-text-secondary-light);
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.stw-toggle {
+  background: color-mix(in srgb, var(--stw-border-subtle) 80%, var(--stw-main-surface));
+  border: 1.5px solid color-mix(in srgb, var(--stw-shell-outline) 40%, transparent);
+  border-radius: 12px;
+  cursor: pointer;
+  height: 24px;
+  padding: 0;
+  position: relative;
+  transition:
+    background var(--stw-motion-standard-ms) var(--stw-motion-easing),
+    border-color var(--stw-motion-standard-ms) var(--stw-motion-easing);
+  width: 44px;
+}
+
+.stw-toggle--on {
+  background: var(--stw-accent-lime);
+  border-color: color-mix(in srgb, var(--stw-shell-outline) 60%, transparent);
+}
+
+.stw-toggle-thumb {
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+  display: block;
+  height: 16px;
+  left: 3px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  transition: left var(--stw-motion-standard-ms) var(--stw-motion-easing);
+  width: 16px;
+}
+
+.stw-toggle--on .stw-toggle-thumb {
+  left: calc(100% - 19px);
 }
 `;

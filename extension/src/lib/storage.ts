@@ -12,7 +12,8 @@ export function getInitialState(): StoredState {
     users: [],
     activeUserId: null,
     visits: [],
-    recentRoastTemplateIds: {}
+    recentRoastTemplateIds: {},
+    toastEnabled: true
   };
 }
 
@@ -81,6 +82,11 @@ export async function setState(driver: StorageDriver, nextState: StoredState): P
   await driver.write(nextState);
 }
 
+export async function setToastEnabled(driver: StorageDriver, enabled: boolean): Promise<void> {
+  const state = await driver.read();
+  await driver.write({ ...state, toastEnabled: enabled });
+}
+
 export async function appendVisit(driver: StorageDriver, visit: VisitRecord): Promise<void> {
   const state = await driver.read();
   await driver.write({
@@ -141,6 +147,7 @@ function parseState(value: unknown): StoredState {
     recentRoastTemplateIds:
       state.recentRoastTemplateIds && typeof state.recentRoastTemplateIds === "object"
         ? state.recentRoastTemplateIds
-        : {}
+        : {},
+    toastEnabled: typeof state.toastEnabled === "boolean" ? state.toastEnabled : true
   };
 }
