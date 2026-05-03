@@ -162,6 +162,9 @@ export function App() {
         case "visitRecorded":
           setVisits((currentVisits) => [event.visit, ...currentVisits.filter((visit) => visit.id !== event.visit.id)]);
           return;
+        case "graphUpdated":
+          // Handled inside KnowledgeGraphPanel via its own subscribeBridgeEvents hook.
+          return;
         default: {
           const exhaustiveCheck: never = event;
           return exhaustiveCheck;
