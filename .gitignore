@@ -10,3 +10,5 @@ extension/build/
 .env.development
 .env.local
 .cursor/
+design.json
+images/
