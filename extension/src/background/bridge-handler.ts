@@ -60,10 +60,15 @@ export function handleBridgeRequest(message: unknown, state: StoredState): Bridg
         type: "getRoasts",
         data: { visits }
       };
-    // These two types are intercepted in background.ts before reaching here.
+    // These request types are intercepted in background.ts before reaching here.
     // The cases exist only to satisfy TypeScript exhaustiveness.
     case "getKnowledgeGraph":
     case "searchKnowledge":
+    case "getAiSetupStatus":
+    case "semanticSearchKnowledge":
+    case "exportKnowledgeGraph":
+    case "importKnowledgeGraph":
+    case "chatKnowledge":
       return {
         id: message.id,
         source: SHAME_THE_WEB_EXTENSION_SOURCE,
@@ -99,6 +104,16 @@ function isBridgeRequest(message: unknown): message is BridgeRequest {
       candidate.type === "getStats" ||
       candidate.type === "getRoasts" ||
       candidate.type === "getKnowledgeGraph" ||
-      candidate.type === "searchKnowledge")
+      candidate.type === "searchKnowledge" ||
+      candidate.type === "getAiSetupStatus" ||
+      candidate.type === "semanticSearchKnowledge" ||
+      candidate.type === "exportKnowledgeGraph" ||
+      (candidate.type === "importKnowledgeGraph" &&
+        typeof (candidate as { fileContents?: unknown }).fileContents === "string" &&
+        ((candidate as { mode?: unknown }).mode === "merge" || (candidate as { mode?: unknown }).mode === "replace")) ||
+      (candidate.type === "chatKnowledge" &&
+        typeof (candidate as { query?: unknown }).query === "string" &&
+        typeof (candidate as { sessionId?: unknown }).sessionId === "string" &&
+        Array.isArray((candidate as { history?: unknown }).history)))
   );
 }

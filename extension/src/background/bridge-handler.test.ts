@@ -5,7 +5,7 @@ import type { BridgeRequest, StoredState } from "@shame-the-web/shared";
 
 import { handleBridgeRequest } from "./bridge-handler";
 
-type SimpleRequestType = Exclude<BridgeRequest["type"], "searchKnowledge">;
+type SimpleRequestType = "ping" | "getSession" | "getVisits" | "getStats" | "getRoasts" | "getKnowledgeGraph";
 
 function request(type: SimpleRequestType): BridgeRequest {
   return {

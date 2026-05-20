@@ -17,7 +17,17 @@ type BridgePushGraphUpdated = {
   nodeCount: number;
 };
 
-type BridgePushEvent = BridgePushVisitRecorded | BridgePushGraphUpdated;
+type BridgePushAiSetupProgress = {
+  source: typeof SHAME_THE_WEB_EXTENSION_SOURCE;
+  event: "aiSetupProgress";
+  status: {
+    phase: string;
+    message: string;
+    updatedAt: string;
+  };
+};
+
+type BridgePushEvent = BridgePushVisitRecorded | BridgePushGraphUpdated | BridgePushAiSetupProgress;
 
 const CONTEXT_INVALID_HINT =
   "Extension was updated or reloaded. Refresh this page to reconnect.";
@@ -131,7 +141,17 @@ function isDashboardRequest(message: unknown): message is BridgeRequest {
       candidate.type === "getStats" ||
       candidate.type === "getRoasts" ||
       candidate.type === "getKnowledgeGraph" ||
-      (candidate.type === "searchKnowledge" && typeof (candidate as { query?: unknown }).query === "string"))
+      candidate.type === "getAiSetupStatus" ||
+      candidate.type === "exportKnowledgeGraph" ||
+      (candidate.type === "importKnowledgeGraph" &&
+        typeof (candidate as { fileContents?: unknown }).fileContents === "string" &&
+        ((candidate as { mode?: unknown }).mode === "merge" || (candidate as { mode?: unknown }).mode === "replace")) ||
+      (candidate.type === "searchKnowledge" && typeof (candidate as { query?: unknown }).query === "string") ||
+      (candidate.type === "semanticSearchKnowledge" && typeof (candidate as { query?: unknown }).query === "string") ||
+      (candidate.type === "chatKnowledge" &&
+        typeof (candidate as { query?: unknown }).query === "string" &&
+        typeof (candidate as { sessionId?: unknown }).sessionId === "string" &&
+        Array.isArray((candidate as { history?: unknown }).history)))
   );
 }
 
@@ -151,6 +171,10 @@ function isBridgePushEvent(message: unknown): message is BridgePushEvent {
 
   if (candidate["event"] === "graphUpdated") {
     return typeof candidate["nodeCount"] === "number";
+  }
+
+  if (candidate["event"] === "aiSetupProgress") {
+    return !!candidate["status"] && typeof candidate["status"] === "object";
   }
 
   return false;
