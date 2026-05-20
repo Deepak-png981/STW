@@ -13,6 +13,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
+    "@huggingface/transformers": "^4.2.0",
+    "@mlc-ai/web-llm": "^0.2.83",
     "@shame-the-web/shared": "0.0.0",
     "plasmo": "^0.90.5",
     "react": "^19.2.5",
@@ -22,8 +24,15 @@
     "name": "Shame The Web",
     "background_color": "#e7e7e7",
     "theme_color": "#c9d67a",
-    "permissions": ["storage", "tabs"],
-    "host_permissions": ["http://*/*", "https://*/*"],
+    "permissions": [
+      "storage",
+      "tabs",
+      "offscreen"
+    ],
+    "host_permissions": [
+      "http://*/*",
+      "https://*/*"
+    ],
     "externally_connectable": {
       "matches": [
         "http://localhost:5173/*",
