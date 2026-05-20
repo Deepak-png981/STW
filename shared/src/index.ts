@@ -42,6 +42,94 @@ export type KnowledgeSearchResult = {
   snippet: string;
   score: number;
 };
+
+export type KnowledgeChunkType = "title" | "description" | "headings" | "body";
+
+export type KnowledgeChunk = {
+  id: string;
+  pageUrl: string;
+  text: string;
+  type: KnowledgeChunkType;
+  index: number;
+  visitedAt: string;
+  contentHash: string;
+};
+
+export type ChunkEmbedding = {
+  id: string;
+  chunkId: string;
+  pageUrl: string;
+  model: string;
+  dims: number;
+  vector: readonly number[];
+  contentHash: string;
+  createdAt: string;
+};
+
+export type SemanticReason = "semantic" | "keyword" | "graph" | "recent" | "visited";
+
+export type SemanticSearchResult = KnowledgeSearchResult & {
+  reasons: readonly SemanticReason[];
+  matchedChunkId: string | null;
+};
+
+export type ChatRole = "system" | "user" | "assistant";
+
+export type ChatMessage = {
+  role: ChatRole;
+  content: string;
+};
+
+export type ChatSource = {
+  url: string;
+  title: string;
+  snippet: string;
+};
+
+export type ChatTurnResponse = {
+  text: string;
+  sources: readonly ChatSource[];
+  model: string;
+};
+
+export type KnowledgeExportFormatVersion = 1;
+export type KnowledgeImportMode = "merge" | "replace";
+
+export type KnowledgeGraphExportV1 = {
+  formatVersion: KnowledgeExportFormatVersion;
+  app: "shame-the-web";
+  exportedAt: string;
+  pages: readonly PageContent[];
+  graph: KnowledgeGraph;
+  visits: readonly VisitRecord[];
+};
+
+export type AiSetupPhase =
+  | "idle"
+  | "downloading_embed"
+  | "indexing"
+  | "ready_search"
+  | "downloading_slm"
+  | "ready_chat"
+  | "error";
+
+export type AiSetupStatus = {
+  phase: AiSetupPhase;
+  message: string;
+  progressPct: number | null;
+  current: number | null;
+  total: number | null;
+  updatedAt: string;
+};
+
+export const DEFAULT_AI_SETUP_STATUS: AiSetupStatus = {
+  phase: "idle",
+  message: "Local AI setup has not started yet.",
+  progressPct: null,
+  current: null,
+  total: null,
+  updatedAt: new Date(0).toISOString()
+};
 export const EXTENSION_INSTALL_URL =
   "https://github.com/deepak-io/shame_the_web/releases/latest" as const;
 
@@ -113,7 +201,25 @@ export type BridgeRequest =
   | { id: string; source: typeof SHAME_THE_WEB_BRIDGE_SOURCE; type: "getStats" }
   | { id: string; source: typeof SHAME_THE_WEB_BRIDGE_SOURCE; type: "getRoasts" }
   | { id: string; source: typeof SHAME_THE_WEB_BRIDGE_SOURCE; type: "getKnowledgeGraph" }
-  | { id: string; source: typeof SHAME_THE_WEB_BRIDGE_SOURCE; type: "searchKnowledge"; query: string };
+  | { id: string; source: typeof SHAME_THE_WEB_BRIDGE_SOURCE; type: "searchKnowledge"; query: string }
+  | { id: string; source: typeof SHAME_THE_WEB_BRIDGE_SOURCE; type: "getAiSetupStatus" }
+  | { id: string; source: typeof SHAME_THE_WEB_BRIDGE_SOURCE; type: "semanticSearchKnowledge"; query: string }
+  | { id: string; source: typeof SHAME_THE_WEB_BRIDGE_SOURCE; type: "exportKnowledgeGraph" }
+  | {
+      id: string;
+      source: typeof SHAME_THE_WEB_BRIDGE_SOURCE;
+      type: "importKnowledgeGraph";
+      fileContents: string;
+      mode: KnowledgeImportMode;
+    }
+  | {
+      id: string;
+      source: typeof SHAME_THE_WEB_BRIDGE_SOURCE;
+      type: "chatKnowledge";
+      query: string;
+      sessionId: string;
+      history: readonly ChatMessage[];
+    };
 
 export type BridgeEvent =
   | {
@@ -130,6 +236,11 @@ export type BridgeEvent =
       source: typeof SHAME_THE_WEB_EXTENSION_SOURCE;
       event: "graphUpdated";
       nodeCount: number;
+    }
+  | {
+      source: typeof SHAME_THE_WEB_EXTENSION_SOURCE;
+      event: "aiSetupProgress";
+      status: AiSetupStatus;
     };
 
 export type BridgeResponse =
@@ -181,6 +292,49 @@ export type BridgeResponse =
       ok: true;
       type: "searchKnowledge";
       data: { results: KnowledgeSearchResult[] };
+    }
+  | {
+      id: string;
+      source: typeof SHAME_THE_WEB_EXTENSION_SOURCE;
+      ok: true;
+      type: "getAiSetupStatus";
+      data: { status: AiSetupStatus };
+    }
+  | {
+      id: string;
+      source: typeof SHAME_THE_WEB_EXTENSION_SOURCE;
+      ok: true;
+      type: "semanticSearchKnowledge";
+      data: { results: SemanticSearchResult[] };
+    }
+  | {
+      id: string;
+      source: typeof SHAME_THE_WEB_EXTENSION_SOURCE;
+      ok: true;
+      type: "chatKnowledge";
+      data: ChatTurnResponse;
+    }
+  | {
+      id: string;
+      source: typeof SHAME_THE_WEB_EXTENSION_SOURCE;
+      ok: true;
+      type: "exportKnowledgeGraph";
+      data: {
+        filename: string;
+        json: string;
+        pageCount: number;
+        edgeCount: number;
+      };
+    }
+  | {
+      id: string;
+      source: typeof SHAME_THE_WEB_EXTENSION_SOURCE;
+      ok: true;
+      type: "importKnowledgeGraph";
+      data: {
+        importedPageCount: number;
+        mode: KnowledgeImportMode;
+      };
     }
   | {
       id: string;
