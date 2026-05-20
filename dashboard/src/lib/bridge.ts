@@ -1,7 +1,16 @@
 import { SHAME_THE_WEB_BRIDGE_SOURCE, SHAME_THE_WEB_EXTENSION_SOURCE } from "@shame-the-web/shared";
 import type { BridgeEvent, BridgeRequest, BridgeResponse } from "@shame-the-web/shared";
 
-const REQUEST_TIMEOUT_MS = 1500;
+const DEFAULT_REQUEST_TIMEOUT_MS = 1500;
+const SLOW_REQUEST_TIMEOUT_MS = 20000;
+
+const SLOW_REQUEST_TYPES: ReadonlySet<BridgeRequest["type"]> = new Set([
+  "getAiSetupStatus",
+  "semanticSearchKnowledge",
+  "chatKnowledge",
+  "importKnowledgeGraph",
+  "exportKnowledgeGraph"
+]);
 
 export async function requestBridge<T extends BridgeRequest["type"]>(
   type: T,
@@ -15,10 +24,11 @@ export async function requestBridge<T extends BridgeRequest["type"]>(
   } as BridgeRequest;
 
   return new Promise((resolve, reject) => {
+    const timeoutMs = SLOW_REQUEST_TYPES.has(type) ? SLOW_REQUEST_TIMEOUT_MS : DEFAULT_REQUEST_TIMEOUT_MS;
     const timeout = window.setTimeout(() => {
       window.removeEventListener("message", handleMessage);
       reject(new Error("Extension bridge did not respond. Is the extension loaded?"));
-    }, REQUEST_TIMEOUT_MS);
+    }, timeoutMs);
 
     function handleMessage(event: MessageEvent<unknown>) {
       if (event.source !== window || !isBridgeResponse(event.data) || event.data.id !== request.id) {
@@ -88,6 +98,8 @@ function isBridgeEvent(message: unknown): message is BridgeEvent {
       return !!candidate["visit"] && typeof candidate["visit"] === "object";
     case "graphUpdated":
       return typeof candidate["nodeCount"] === "number";
+    case "aiSetupProgress":
+      return !!candidate["status"] && typeof candidate["status"] === "object";
     default:
       return false;
   }

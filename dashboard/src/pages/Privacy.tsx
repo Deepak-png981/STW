@@ -40,6 +40,10 @@ export function PrivacyPage() {
         transmit browsing content off-device unless you explicitly export or enable a sync feature. We do not sell or share
         your browsing data with third parties.
       </p>
+      <p>
+        Local AI models are downloaded on-device and cached by the browser for semantic search and conversation features.
+        If browser cache data is cleared, the extension re-downloads model assets and notifies you in the dashboard status.
+      </p>
 
       <h2>Permissions explained</h2>
       <ul>
@@ -62,7 +66,11 @@ export function PrivacyPage() {
       <ul>
         <li>You can disable indexing (the knowledge graph) in the extension Options.</li>
         <li>You can clear all stored data from the extension settings at any time.</li>
-        <li>If you export data, you will be prompted to confirm and choose the exported file location.</li>
+        <li>If you export data, you will be prompted to choose the exported file location on your own device.</li>
+        <li>
+          Imported graph files are processed locally in the extension; model binaries are not included in export files and
+          are re-downloaded locally if needed.
+        </li>
       </ul>
 
       <h2>Data retention</h2>

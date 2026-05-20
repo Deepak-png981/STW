@@ -166,6 +166,9 @@ export function App() {
         case "graphUpdated":
           // Handled inside KnowledgeGraphPanel via its own subscribeBridgeEvents hook.
           return;
+        case "aiSetupProgress":
+          // Handled inside KnowledgeGraphPanel via its own subscribeBridgeEvents hook.
+          return;
         default: {
           const exhaustiveCheck: never = event;
           return exhaustiveCheck;

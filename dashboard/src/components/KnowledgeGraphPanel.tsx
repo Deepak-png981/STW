@@ -2,7 +2,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Graph from "graphology";
 import { Sigma } from "sigma";
 import forceAtlas2 from "graphology-layout-forceatlas2";
-import type { KnowledgeGraph, KnowledgeNode, KnowledgeSearchResult } from "@shame-the-web/shared";
+import type {
+  AiSetupStatus,
+  ChatMessage,
+  KnowledgeImportMode,
+  SemanticReason,
+  SemanticSearchResult
+} from "@shame-the-web/shared";
+import { DEFAULT_AI_SETUP_STATUS } from "@shame-the-web/shared";
+import type { KnowledgeGraph, KnowledgeNode } from "@shame-the-web/shared";
 
 import { requestBridge, subscribeBridgeEvents } from "../lib/bridge";
 
@@ -36,17 +44,25 @@ export function KnowledgeGraphPanel() {
   const [hoveredNode, setHoveredNode] = useState<KnowledgeNode | null>(null);
   const [selectedNode, setSelectedNode] = useState<KnowledgeNode | null>(null);
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<KnowledgeSearchResult[]>([]);
+  const [results, setResults] = useState<SemanticSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [showNodeLabels, setShowNodeLabels] = useState(true);
+  const [aiStatus, setAiStatus] = useState<AiSetupStatus>(DEFAULT_AI_SETUP_STATUS);
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [chatLoading, setChatLoading] = useState(false);
+  const [importMode, setImportMode] = useState<KnowledgeImportMode>("merge");
+  const [transferBusy, setTransferBusy] = useState(false);
+  const [transferMessage, setTransferMessage] = useState("");
   const showNodeLabelsRef = useRef(showNodeLabels);
   showNodeLabelsRef.current = showNodeLabels;
 
   const fetchGraph = useCallback(() => {
-    requestBridge("getKnowledgeGraph")
-      .then((response) => {
-        setGraphData(response.data.graph);
+    Promise.all([requestBridge("getKnowledgeGraph"), requestBridge("getAiSetupStatus")])
+      .then(([graphResponse, statusResponse]) => {
+        setGraphData(graphResponse.data.graph);
+        setAiStatus(statusResponse.data.status);
         setLoading(false);
       })
       .catch(() => {
@@ -61,10 +77,15 @@ export function KnowledgeGraphPanel() {
   // Auto-refresh the graph whenever the background signals it has been rebuilt.
   useEffect(() => {
     return subscribeBridgeEvents((event) => {
-      // TypeScript 6 strict narrowing: cast through unknown to compare the event
-      // discriminant without hitting TS2367 "no overlap" errors.
-      if ((event as unknown as { event: string }).event === "graphUpdated") {
-        fetchGraph();
+      switch (event.event) {
+        case "graphUpdated":
+          fetchGraph();
+          break;
+        case "aiSetupProgress":
+          setAiStatus(event.status);
+          break;
+        default:
+          break;
       }
     });
   }, [fetchGraph]);
@@ -197,10 +218,21 @@ export function KnowledgeGraphPanel() {
     setSearching(true);
     setHasSearched(true);
     try {
-      const response = await requestBridge("searchKnowledge", { query: q });
+      const response = await requestBridge("semanticSearchKnowledge", { query: q });
       setResults(response.data.results);
     } catch {
-      setResults([]);
+      try {
+        const fallback = await requestBridge("searchKnowledge", { query: q });
+        setResults(
+          fallback.data.results.map((result) => ({
+            ...result,
+            reasons: ["keyword"] as const,
+            matchedChunkId: null
+          }))
+        );
+      } catch {
+        setResults([]);
+      }
     } finally {
       setSearching(false);
     }
@@ -212,6 +244,82 @@ export function KnowledgeGraphPanel() {
     if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
     searchTimerRef.current = setTimeout(() => void runSearch(val), 350);
   };
+
+  const sendChat = useCallback(async () => {
+    const message = chatInput.trim();
+    if (!message) {
+      return;
+    }
+    setChatLoading(true);
+    const nextHistory: ChatMessage[] = [...chatHistory, { role: "user", content: message }];
+    setChatHistory(nextHistory);
+    setChatInput("");
+    try {
+      const response = await requestBridge("chatKnowledge", {
+        query: message,
+        sessionId: "local-default",
+        history: nextHistory
+      });
+      setChatHistory((current) => [...current, { role: "assistant", content: response.data.text }]);
+    } catch (error) {
+      setChatHistory((current) => [
+        ...current,
+        {
+          role: "assistant",
+          content:
+            error instanceof Error
+              ? `Local chat failed: ${error.message}`
+              : "Local chat failed. You can continue using semantic search results."
+        }
+      ]);
+    } finally {
+      setChatLoading(false);
+    }
+  }, [chatHistory, chatInput]);
+
+  const exportKnowledge = useCallback(async () => {
+    setTransferBusy(true);
+    try {
+      const response = await requestBridge("exportKnowledgeGraph");
+      const blob = new Blob([response.data.json], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = response.data.filename;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      setTransferMessage(
+        `Exported ${response.data.pageCount} pages and ${response.data.edgeCount} graph connections.`
+      );
+    } catch (error) {
+      setTransferMessage(error instanceof Error ? error.message : "Export failed.");
+    } finally {
+      setTransferBusy(false);
+    }
+  }, []);
+
+  const importKnowledge = useCallback(
+    async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (!file) {
+        return;
+      }
+      setTransferBusy(true);
+      setTransferMessage("Importing knowledge graph…");
+      try {
+        const fileContents = await file.text();
+        const response = await requestBridge("importKnowledgeGraph", { fileContents, mode: importMode });
+        setTransferMessage(`Imported ${response.data.importedPageCount} pages (${response.data.mode}).`);
+        fetchGraph();
+      } catch (error) {
+        setTransferMessage(error instanceof Error ? error.message : "Import failed.");
+      } finally {
+        setTransferBusy(false);
+        event.target.value = "";
+      }
+    },
+    [fetchGraph, importMode]
+  );
 
   const tooltipNode = selectedNode ?? hoveredNode;
   const hasData = graphData && graphData.nodes.length > 0;
@@ -239,6 +347,10 @@ export function KnowledgeGraphPanel() {
           </div>
         ) : null}
       </div>
+      <p className="bridge-status knowledge-graph-meta">
+        Local AI: {aiStatus.message}
+        {typeof aiStatus.progressPct === "number" ? ` (${aiStatus.progressPct}%)` : ""}
+      </p>
 
       <div className="knowledge-graph-layout">
         <div className="knowledge-graph-container knowledge-graph-canvas-wrap">
@@ -330,6 +442,11 @@ export function KnowledgeGraphPanel() {
                     {result.snippet ? (
                       <p className="knowledge-result-snippet">{result.snippet}</p>
                     ) : null}
+                    {result.reasons.length > 0 ? (
+                      <p className="knowledge-result-date">
+                        {result.reasons.map((reason) => reasonLabel(reason)).join(" · ")}
+                      </p>
+                    ) : null}
                     <small className="knowledge-result-date">{formatDate(result.lastVisited)}</small>
                   </article>
                 ))
@@ -342,6 +459,86 @@ export function KnowledgeGraphPanel() {
                     Type something you remember — a topic, a tool name, or a concept. We&apos;ll find the page.
                   </p>
                 )}
+          </div>
+
+          <div className="knowledge-search-results">
+            <p className="knowledge-search-heading">Conversation (local SLM)</p>
+            <div className="knowledge-search-results">
+              {chatHistory.length === 0 ? (
+                <p className="empty-copy knowledge-empty-copy">
+                  Ask follow-up questions after search. Replies stay local and use retrieved snippets.
+                </p>
+              ) : (
+                chatHistory.map((message, index) => (
+                  <article key={`${message.role}-${index}`} className="knowledge-result-card knowledge-result-card--nexus">
+                    <small className="knowledge-result-date">{message.role === "user" ? "You" : "Local AI"}</small>
+                    <p className="knowledge-result-snippet">{message.content}</p>
+                  </article>
+                ))
+              )}
+            </div>
+            <div className="knowledge-search-row">
+              <input
+                type="text"
+                className="knowledge-search-input knowledge-search-input--nexus"
+                placeholder="Ask a follow-up question…"
+                value={chatInput}
+                onChange={(e) => setChatInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") void sendChat();
+                }}
+              />
+              <button
+                type="button"
+                className="button knowledge-graph-find-btn"
+                onClick={() => void sendChat()}
+                disabled={chatLoading || !chatInput.trim()}
+              >
+                {chatLoading ? "…" : "Ask"}
+              </button>
+            </div>
+          </div>
+
+          <div className="knowledge-search-results">
+            <p className="knowledge-search-heading">Knowledge graph transfer</p>
+            <p className="empty-copy knowledge-empty-copy">
+              Export saves only your local graph data. Import re-indexes embeddings on-device after load.
+            </p>
+            <div className="knowledge-search-row">
+              <button
+                type="button"
+                className="button knowledge-graph-find-btn"
+                onClick={() => void exportKnowledge()}
+                disabled={transferBusy}
+              >
+                Export graph
+              </button>
+              <label className="knowledge-graph-label-toggle">
+                <input
+                  type="radio"
+                  name="importMode"
+                  checked={importMode === "merge"}
+                  onChange={() => setImportMode("merge")}
+                />
+                <span>Merge</span>
+              </label>
+              <label className="knowledge-graph-label-toggle">
+                <input
+                  type="radio"
+                  name="importMode"
+                  checked={importMode === "replace"}
+                  onChange={() => setImportMode("replace")}
+                />
+                <span>Replace all</span>
+              </label>
+              <input
+                type="file"
+                accept=".json,.stw.json"
+                onChange={(event) => void importKnowledge(event)}
+                disabled={transferBusy}
+              />
+            </div>
+            {transferMessage ? <p className="knowledge-result-date">{transferMessage}</p> : null}
           </div>
         </div>
       </div>
@@ -369,5 +566,24 @@ function formatDate(iso: string): string {
     });
   } catch {
     return iso;
+  }
+}
+
+function reasonLabel(reason: SemanticReason): string {
+  switch (reason) {
+    case "semantic":
+      return "Semantic match";
+    case "keyword":
+      return "Keyword overlap";
+    case "graph":
+      return "Graph neighbor";
+    case "recent":
+      return "Recently visited";
+    case "visited":
+      return "Frequent page";
+    default: {
+      const exhaustiveCheck: never = reason;
+      return exhaustiveCheck;
+    }
   }
 }
