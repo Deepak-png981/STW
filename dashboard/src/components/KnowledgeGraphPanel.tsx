@@ -1,17 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import Graph from "graphology";
 import { Sigma } from "sigma";
 import forceAtlas2 from "graphology-layout-forceatlas2";
-import type { AiSetupStatus, ChatMessage, ChatSource, SemanticReason, SemanticSearchResult } from "@shame-the-web/shared";
+import type { AiSetupStatus, ChatMessage, SemanticReason, SemanticSearchResult } from "@shame-the-web/shared";
 import { DEFAULT_AI_SETUP_STATUS } from "@shame-the-web/shared";
 import type { KnowledgeGraph, KnowledgeNode } from "@shame-the-web/shared";
 
 import { requestBridge, subscribeBridgeEvents } from "../lib/bridge";
+import { KnowledgeChatRail } from "./knowledge/knowledge-chat-rail";
+import { useChatRailWidth } from "./knowledge/use-chat-rail-width";
 import {
   clearThreadMessages,
   createEmptyChatThread,
   prependThread,
-  truncateChatTitle,
   updateThreadById,
   withThreadMessages
 } from "./knowledge-chat-threads";
@@ -45,6 +46,7 @@ function edgeColorForWeight(weight: number): string {
 
 export function KnowledgeGraphPanel() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const graphContainerRef = useRef<HTMLDivElement>(null);
   const sigmaRef = useRef<Sigma | null>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -64,17 +66,16 @@ export function KnowledgeGraphPanel() {
   });
   const [activeChatId, setActiveChatId] = useState("");
   const [chatInput, setChatInput] = useState("");
-  const [openFlyout, setOpenFlyout] = useState<null | "search" | "chat">(null);
-  const [isChatHistoryOpen, setIsChatHistoryOpen] = useState(false);
-  const [lastChatSources, setLastChatSources] = useState<readonly ChatSource[]>([]);
+  const [openFlyout, setOpenFlyout] = useState<null | "search">(null);
+  const [isChatOpen, setIsChatOpen] = useState(true);
+  const [isChatHistoryOpen, setIsChatHistoryOpen] = useState(true);
+  const { width: chatRailWidth, isResizing: isChatRailResizing, startResize: startChatRailResize } =
+    useChatRailWidth();
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const chatInputRef = useRef<HTMLInputElement>(null);
-  const chatHistoryMenuRef = useRef<HTMLDivElement>(null);
   const showNodeLabelsRef = useRef(showNodeLabels);
   showNodeLabelsRef.current = showNodeLabels;
 
   const activeChat = chatThreads.find((thread) => thread.id === activeChatId) ?? chatThreads[0];
-  const chatHistory = activeChat?.messages ?? [];
   const isChatLoading = activeChat?.pendingRequestId !== null;
 
   useEffect(() => {
@@ -84,8 +85,12 @@ export function KnowledgeGraphPanel() {
     }
   }, [activeChatId, chatThreads]);
 
-  const toggleFlyout = useCallback((panel: "search" | "chat") => {
+  const toggleFlyout = useCallback((panel: "search") => {
     setOpenFlyout((current) => (current === panel ? null : panel));
+  }, []);
+
+  const toggleChatRail = useCallback(() => {
+    setIsChatOpen((current) => !current);
   }, []);
 
   const closeFlyout = useCallback(() => {
@@ -110,25 +115,8 @@ export function KnowledgeGraphPanel() {
   useEffect(() => {
     if (openFlyout === "search") {
       searchInputRef.current?.focus();
-      return;
-    }
-    if (openFlyout === "chat") {
-      chatInputRef.current?.focus();
     }
   }, [openFlyout]);
-
-  useEffect(() => {
-    if (!isChatHistoryOpen) {
-      return;
-    }
-    const onPointerDown = (event: PointerEvent) => {
-      if (!chatHistoryMenuRef.current?.contains(event.target as Node)) {
-        setIsChatHistoryOpen(false);
-      }
-    };
-    window.addEventListener("pointerdown", onPointerDown);
-    return () => window.removeEventListener("pointerdown", onPointerDown);
-  }, [isChatHistoryOpen]);
 
   const fetchGraph = useCallback(() => {
     Promise.all([requestBridge("getKnowledgeGraph"), requestBridge("getAiSetupStatus")])
@@ -275,6 +263,23 @@ export function KnowledgeGraphPanel() {
   }, [graphData]);
 
   useEffect(() => {
+    const graphContainer = graphContainerRef.current;
+    if (!graphContainer) {
+      return;
+    }
+
+    const refreshGraphSize = () => {
+      sigmaRef.current?.resize();
+      sigmaRef.current?.scheduleRefresh();
+    };
+
+    refreshGraphSize();
+    const observer = new ResizeObserver(refreshGraphSize);
+    observer.observe(graphContainer);
+    return () => observer.disconnect();
+  }, [graphData, isChatOpen, chatRailWidth]);
+
+  useEffect(() => {
     const sigma = sigmaRef.current;
     if (!sigma) return;
     sigma.setSetting("renderLabels", showNodeLabels);
@@ -336,10 +341,6 @@ export function KnowledgeGraphPanel() {
 
   const selectChat = useCallback((threadId: string) => {
     setActiveChatId(threadId);
-    setIsChatHistoryOpen(false);
-    setTimeout(() => {
-      chatInputRef.current?.focus();
-    }, 0);
   }, []);
 
   const sendChat = useCallback(async () => {
@@ -368,14 +369,17 @@ export function KnowledgeGraphPanel() {
         sessionId: "local-default",
         history: priorHistory
       });
-      setLastChatSources(response.data.sources);
       console.warn("[STW][chat-debug]", {
         chatQuery: message,
         model: response.data.model,
         sourceCount: response.data.sources.length,
         sources: response.data.sources
       });
-      const assistantReply: ChatMessage = { role: "assistant", content: response.data.text };
+      const assistantReply: ChatMessage = {
+        role: "assistant",
+        content: response.data.text,
+        sources: response.data.sources
+      };
       setChatThreads((current) =>
         updateThreadById(current, chatId, (thread) =>
           thread.pendingRequestId === requestId
@@ -424,6 +428,9 @@ export function KnowledgeGraphPanel() {
   const tooltipNode = selectedNode ?? hoveredNode;
   const hasData = graphData && graphData.nodes.length > 0;
   const aiReadiness = getAiReadiness(aiStatus);
+  const stageStyle = isChatOpen
+    ? ({ ["--chat-rail-width"]: `${chatRailWidth}px` } as CSSProperties)
+    : undefined;
 
   return (
     <section className="section-card knowledge-graph-section knowledge-graph-nexus knowledge-graph-immersive">
@@ -470,8 +477,11 @@ export function KnowledgeGraphPanel() {
         />
       </div>
 
-      <div className="knowledge-graph-stage">
-        <div className="knowledge-graph-container knowledge-graph-canvas-wrap">
+      <div
+        className={`knowledge-graph-stage${isChatOpen ? " is-chat-open" : ""}`}
+        style={stageStyle}
+      >
+        <div ref={graphContainerRef} className="knowledge-graph-container knowledge-graph-canvas-wrap">
           {loading ? (
             <div className="knowledge-graph-empty knowledge-graph-empty--nexus">
               <span>Building your knowledge graph…</span>
@@ -531,10 +541,10 @@ export function KnowledgeGraphPanel() {
           </button>
           <button
             type="button"
-            className={`knowledge-fab knowledge-fab--chat${openFlyout === "chat" ? " is-active" : ""}`}
-            aria-label="Open conversation"
-            aria-expanded={openFlyout === "chat"}
-            onClick={() => toggleFlyout("chat")}
+            className={`knowledge-fab knowledge-fab--chat${isChatOpen ? " is-active" : ""}`}
+            aria-label={isChatOpen ? "Hide conversations" : "Show conversations"}
+            aria-expanded={isChatOpen}
+            onClick={toggleChatRail}
           >
             <ChatFabIcon />
           </button>
@@ -650,121 +660,26 @@ export function KnowledgeGraphPanel() {
           </aside>
         ) : null}
 
-        {openFlyout === "chat" ? (
-          <aside className="knowledge-flyout knowledge-flyout--chat" aria-label="Conversation panel">
-            <div className="knowledge-flyout-header">
-              <h3>Conversation</h3>
-              <button type="button" className="knowledge-flyout-close" onClick={closeFlyout}>
-                Close
-              </button>
-            </div>
-            <div className="knowledge-flyout-body">
-              <section className="knowledge-side-section knowledge-side-section--chat">
-                <div className="knowledge-panel-heading-row">
-                  <div>
-                    <p className="knowledge-search-heading">Ask about your graph</p>
-                    <p className="knowledge-panel-subcopy">
-                      Answers stay local and use your browsing graph context.
-                    </p>
-                  </div>
-                  <div className="knowledge-chat-heading-actions">
-                    <span className={`ai-mini-badge ai-mini-badge--${aiReadiness.chatTone}`}>
-                      {aiReadiness.chatLabel}
-                    </span>
-                    <button
-                      type="button"
-                      className="knowledge-chat-history-toggle"
-                      onClick={() => setIsChatHistoryOpen((current) => !current)}
-                    >
-                      {activeChat ? truncateChatTitle(activeChat.title) : "Chats"}
-                    </button>
-                  </div>
-                </div>
-                {isChatHistoryOpen ? (
-                  <div ref={chatHistoryMenuRef} className="knowledge-chat-history-menu">
-                    <div className="knowledge-chat-history-actions">
-                      <button type="button" className="knowledge-chat-action-btn" onClick={createNewChat}>
-                        New chat
-                      </button>
-                      <button type="button" className="knowledge-chat-action-btn" onClick={clearCurrentChat}>
-                        Clear chat
-                      </button>
-                    </div>
-                    <div className="knowledge-chat-history-list">
-                      {chatThreads.map((thread) => (
-                        <button
-                          key={thread.id}
-                          type="button"
-                          className={`knowledge-chat-history-item${thread.id === activeChat?.id ? " is-active" : ""}`}
-                          onClick={() => selectChat(thread.id)}
-                        >
-                          <strong>{truncateChatTitle(thread.title)}</strong>
-                          <small>{new Date(thread.updatedAt).toLocaleString()}</small>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-                {lastChatSources.length > 0 ? (
-                  <p className="knowledge-context-note">
-                    Chat retrieved {lastChatSources.length} indexed chunk
-                    {lastChatSources.length === 1 ? "" : "s"} from your graph (search panel is separate).
-                  </p>
-                ) : (
-                  <p className="knowledge-context-note">
-                    Chat searches your indexed pages automatically — you do not need to use Search first.
-                  </p>
-                )}
-                <div className="knowledge-chat-thread" aria-live="polite">
-                  {chatHistory.length === 0 ? (
-                    <div className="knowledge-empty-state">
-                      <strong>Start chatting naturally.</strong>
-                      <p>
-                        Example: “My name is Deepak”, then ask “What is my name?” in the same thread.
-                      </p>
-                    </div>
-                  ) : (
-                    chatHistory.map((message, index) => (
-                      <article
-                        key={`${message.role}-${index}`}
-                        className={`knowledge-chat-message knowledge-chat-message--${message.role}`}
-                      >
-                        <small>{message.role === "user" ? "You" : "Local AI"}</small>
-                        <p>{message.content}</p>
-                      </article>
-                    ))
-                  )}
-                  {isChatLoading ? (
-                    <article className="knowledge-chat-message knowledge-chat-message--assistant">
-                      <small>Local AI</small>
-                      <p>Thinking with your local browsing graph…</p>
-                    </article>
-                  ) : null}
-                </div>
-                <div className="knowledge-search-row">
-                  <input
-                    ref={chatInputRef}
-                    type="text"
-                    className="knowledge-search-input knowledge-search-input--nexus"
-                    placeholder="Ask about pages you visited…"
-                    value={chatInput}
-                    onChange={(e) => setChatInput(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") void sendChat();
-                    }}
-                  />
-                  <button
-                    type="button"
-                    className="button knowledge-graph-find-btn"
-                    onClick={() => void sendChat()}
-                    disabled={isChatLoading || !chatInput.trim()}
-                  >
-                    {isChatLoading ? "…" : "Ask"}
-                  </button>
-                </div>
-              </section>
-            </div>
-          </aside>
+        {isChatOpen ? (
+          <KnowledgeChatRail
+            threads={chatThreads}
+            activeChatId={activeChatId}
+            activeChat={activeChat}
+            chatInput={chatInput}
+            isChatLoading={isChatLoading}
+            isHistoryOpen={isChatHistoryOpen}
+            isResizing={isChatRailResizing}
+            chatReadinessTone={aiReadiness.chatTone}
+            chatReadinessLabel={aiReadiness.chatLabel}
+            onChatInputChange={setChatInput}
+            onSendChat={() => void sendChat()}
+            onSelectChat={selectChat}
+            onCreateChat={createNewChat}
+            onClearChat={clearCurrentChat}
+            onToggleHistory={() => setIsChatHistoryOpen((current) => !current)}
+            onClose={toggleChatRail}
+            onResizeStart={startChatRailResize}
+          />
         ) : null}
       </div>
     </section>
