@@ -75,15 +75,17 @@ export type SemanticSearchResult = KnowledgeSearchResult & {
 
 export type ChatRole = "system" | "user" | "assistant";
 
-export type ChatMessage = {
-  role: ChatRole;
-  content: string;
-};
-
 export type ChatSource = {
   url: string;
   title: string;
   snippet: string;
+};
+
+export type ChatMessage = {
+  role: ChatRole;
+  content: string;
+  /** Indexed chunks retrieved for this assistant turn (chat-only, not search panel). */
+  sources?: readonly ChatSource[];
 };
 
 export type ChatTurnResponse = {
