@@ -141,7 +141,7 @@ export function formatTiming(ms?: number | null): string {
 
 export function formatScore(score?: number | null): string {
   if (typeof score !== "number" || !Number.isFinite(score)) {
-    return "—";
+    return "N/A";
   }
 
   return `${clampScore(score)} / 100`;
