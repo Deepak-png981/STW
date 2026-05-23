@@ -2,17 +2,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Graph from "graphology";
 import { Sigma } from "sigma";
 import forceAtlas2 from "graphology-layout-forceatlas2";
-import type {
-  AiSetupStatus,
-  ChatMessage,
-  KnowledgeImportMode,
-  SemanticReason,
-  SemanticSearchResult
-} from "@shame-the-web/shared";
+import type { AiSetupStatus, ChatMessage, SemanticReason, SemanticSearchResult } from "@shame-the-web/shared";
 import { DEFAULT_AI_SETUP_STATUS } from "@shame-the-web/shared";
 import type { KnowledgeGraph, KnowledgeNode } from "@shame-the-web/shared";
 
 import { requestBridge, subscribeBridgeEvents } from "../lib/bridge";
+import {
+  clearThreadMessages,
+  createEmptyChatThread,
+  prependThread,
+  truncateChatTitle,
+  updateThreadById,
+  withThreadMessages
+} from "./knowledge-chat-threads";
+import type { ChatThread } from "./knowledge-chat-threads";
 
 /** Saturated neon palette (GitNexus-inspired: purple, cyan, lime, coral, amber…) */
 const CLUSTER_COLORS = [
@@ -27,6 +30,12 @@ const CLUSTER_COLORS = [
   "#818cf8",
   "#2dd4bf"
 ];
+
+const SUGGESTED_SEARCHES = [
+  "What did I read about AI?",
+  "Find pages from YouTube",
+  "What did I see on GitHub?"
+] as const;
 
 function edgeColorForWeight(weight: number): string {
   const a = Math.round(40 + Math.min(1, weight) * 140);
@@ -49,14 +58,76 @@ export function KnowledgeGraphPanel() {
   const [hasSearched, setHasSearched] = useState(false);
   const [showNodeLabels, setShowNodeLabels] = useState(true);
   const [aiStatus, setAiStatus] = useState<AiSetupStatus>(DEFAULT_AI_SETUP_STATUS);
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
+  const [chatThreads, setChatThreads] = useState<ChatThread[]>(() => {
+    const initialThread = createEmptyChatThread();
+    return [initialThread];
+  });
+  const [activeChatId, setActiveChatId] = useState("");
   const [chatInput, setChatInput] = useState("");
-  const [chatLoading, setChatLoading] = useState(false);
-  const [importMode, setImportMode] = useState<KnowledgeImportMode>("merge");
-  const [transferBusy, setTransferBusy] = useState(false);
-  const [transferMessage, setTransferMessage] = useState("");
+  const [openFlyout, setOpenFlyout] = useState<null | "search" | "chat">(null);
+  const [isChatHistoryOpen, setIsChatHistoryOpen] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
+  const chatHistoryMenuRef = useRef<HTMLDivElement>(null);
   const showNodeLabelsRef = useRef(showNodeLabels);
   showNodeLabelsRef.current = showNodeLabels;
+
+  const activeChat = chatThreads.find((thread) => thread.id === activeChatId) ?? chatThreads[0];
+  const chatHistory = activeChat?.messages ?? [];
+  const isChatLoading = activeChat?.pendingRequestId !== null;
+
+  useEffect(() => {
+    const hasActiveChat = chatThreads.some((thread) => thread.id === activeChatId);
+    if ((!activeChatId || !hasActiveChat) && chatThreads[0]) {
+      setActiveChatId(chatThreads[0].id);
+    }
+  }, [activeChatId, chatThreads]);
+
+  const toggleFlyout = useCallback((panel: "search" | "chat") => {
+    setOpenFlyout((current) => (current === panel ? null : panel));
+  }, []);
+
+  const closeFlyout = useCallback(() => {
+    setOpenFlyout(null);
+  }, []);
+
+  useEffect(() => {
+    if (openFlyout === null) {
+      return;
+    }
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpenFlyout(null);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [openFlyout]);
+
+  useEffect(() => {
+    if (openFlyout === "search") {
+      searchInputRef.current?.focus();
+      return;
+    }
+    if (openFlyout === "chat") {
+      chatInputRef.current?.focus();
+    }
+  }, [openFlyout]);
+
+  useEffect(() => {
+    if (!isChatHistoryOpen) {
+      return;
+    }
+    const onPointerDown = (event: PointerEvent) => {
+      if (!chatHistoryMenuRef.current?.contains(event.target as Node)) {
+        setIsChatHistoryOpen(false);
+      }
+    };
+    window.addEventListener("pointerdown", onPointerDown);
+    return () => window.removeEventListener("pointerdown", onPointerDown);
+  }, [isChatHistoryOpen]);
 
   const fetchGraph = useCallback(() => {
     Promise.all([requestBridge("getKnowledgeGraph"), requestBridge("getAiSetupStatus")])
@@ -245,88 +316,126 @@ export function KnowledgeGraphPanel() {
     searchTimerRef.current = setTimeout(() => void runSearch(val), 350);
   };
 
+  const createNewChat = useCallback(() => {
+    const nextThread = createEmptyChatThread();
+    setChatThreads((current) => prependThread(current, nextThread));
+    setActiveChatId(nextThread.id);
+    setChatInput("");
+    setIsChatHistoryOpen(false);
+  }, []);
+
+  const clearCurrentChat = useCallback(() => {
+    if (!activeChat) {
+      return;
+    }
+    setChatThreads((current) => updateThreadById(current, activeChat.id, clearThreadMessages));
+    setChatInput("");
+    setIsChatHistoryOpen(false);
+  }, [activeChat]);
+
+  const selectChat = useCallback((threadId: string) => {
+    setActiveChatId(threadId);
+    setIsChatHistoryOpen(false);
+    setTimeout(() => {
+      chatInputRef.current?.focus();
+    }, 0);
+  }, []);
+
   const sendChat = useCallback(async () => {
+    if (!activeChat) {
+      return;
+    }
     const message = chatInput.trim();
     if (!message) {
       return;
     }
-    setChatLoading(true);
-    const nextHistory: ChatMessage[] = [...chatHistory, { role: "user", content: message }];
-    setChatHistory(nextHistory);
+
+    const chatId = activeChat.id;
+    const requestId = `${chatId}-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+    const priorHistory = activeChat.messages;
+    const nextUserMessage: ChatMessage = { role: "user", content: message };
+    setChatThreads((current) =>
+      updateThreadById(current, chatId, (thread) =>
+        withThreadMessages(thread, [...thread.messages, nextUserMessage], requestId)
+      )
+    );
     setChatInput("");
+
+    if (isGreeting(message)) {
+      const greetingReply: ChatMessage = {
+        role: "assistant",
+        content:
+          "Hi! I can answer questions about pages in your local browsing graph and I also keep context inside this chat."
+      };
+      setChatThreads((current) =>
+        updateThreadById(current, chatId, (thread) =>
+          thread.pendingRequestId === requestId
+            ? withThreadMessages(thread, [...thread.messages, greetingReply], null)
+            : thread
+        )
+      );
+      return;
+    }
+
     try {
       const response = await requestBridge("chatKnowledge", {
         query: message,
         sessionId: "local-default",
-        history: nextHistory
+        history: priorHistory
       });
-      setChatHistory((current) => [...current, { role: "assistant", content: response.data.text }]);
-    } catch (error) {
-      setChatHistory((current) => [
-        ...current,
-        {
-          role: "assistant",
-          content:
-            error instanceof Error
-              ? `Local chat failed: ${error.message}`
-              : "Local chat failed. You can continue using semantic search results."
-        }
-      ]);
-    } finally {
-      setChatLoading(false);
-    }
-  }, [chatHistory, chatInput]);
-
-  const exportKnowledge = useCallback(async () => {
-    setTransferBusy(true);
-    try {
-      const response = await requestBridge("exportKnowledgeGraph");
-      const blob = new Blob([response.data.json], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = response.data.filename;
-      anchor.click();
-      URL.revokeObjectURL(url);
-      setTransferMessage(
-        `Exported ${response.data.pageCount} pages and ${response.data.edgeCount} graph connections.`
+      const assistantReply: ChatMessage = { role: "assistant", content: response.data.text };
+      setChatThreads((current) =>
+        updateThreadById(current, chatId, (thread) =>
+          thread.pendingRequestId === requestId
+            ? withThreadMessages(thread, [...thread.messages, assistantReply], null)
+            : thread
+        )
       );
     } catch (error) {
-      setTransferMessage(error instanceof Error ? error.message : "Export failed.");
+      const errorReply: ChatMessage = {
+        role: "assistant",
+        content:
+          error instanceof Error
+            ? `Local chat failed: ${error.message}`
+            : "Local chat failed. You can continue using semantic search results."
+      };
+      setChatThreads((current) =>
+        updateThreadById(current, chatId, (thread) =>
+          thread.pendingRequestId === requestId
+            ? withThreadMessages(thread, [...thread.messages, errorReply], null)
+            : thread
+        )
+      );
     } finally {
-      setTransferBusy(false);
+      setChatThreads((current) =>
+        updateThreadById(current, chatId, (thread) =>
+          thread.pendingRequestId === requestId
+            ? {
+                ...thread,
+                pendingRequestId: null,
+                updatedAt: new Date().toISOString()
+              }
+            : thread
+        )
+      );
     }
-  }, []);
+  }, [activeChat, chatInput]);
 
-  const importKnowledge = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      if (!file) {
-        return;
-      }
-      setTransferBusy(true);
-      setTransferMessage("Importing knowledge graph…");
-      try {
-        const fileContents = await file.text();
-        const response = await requestBridge("importKnowledgeGraph", { fileContents, mode: importMode });
-        setTransferMessage(`Imported ${response.data.importedPageCount} pages (${response.data.mode}).`);
-        fetchGraph();
-      } catch (error) {
-        setTransferMessage(error instanceof Error ? error.message : "Import failed.");
-      } finally {
-        setTransferBusy(false);
-        event.target.value = "";
-      }
+  const runSuggestedSearch = useCallback(
+    (suggestion: string) => {
+      setQuery(suggestion);
+      void runSearch(suggestion);
     },
-    [fetchGraph, importMode]
+    [runSearch]
   );
 
   const tooltipNode = selectedNode ?? hoveredNode;
   const hasData = graphData && graphData.nodes.length > 0;
+  const aiReadiness = getAiReadiness(aiStatus);
 
   return (
-    <section className="section-card knowledge-graph-section knowledge-graph-nexus">
-      <div className="section-heading knowledge-graph-nexus-heading">
+    <section className="section-card knowledge-graph-section knowledge-graph-nexus knowledge-graph-immersive">
+      <div className="knowledge-graph-immersive-header knowledge-graph-nexus-heading">
         <div>
           <p className="eyebrow knowledge-graph-eyebrow">Your browsing knowledge graph</p>
           <h2 className="knowledge-graph-title">Every page you&apos;ve visited, connected by topic.</h2>
@@ -347,12 +456,29 @@ export function KnowledgeGraphPanel() {
           </div>
         ) : null}
       </div>
-      <p className="bridge-status knowledge-graph-meta">
-        Local AI: {aiStatus.message}
-        {typeof aiStatus.progressPct === "number" ? ` (${aiStatus.progressPct}%)` : ""}
-      </p>
 
-      <div className="knowledge-graph-layout">
+      <div className="ai-readiness-grid" aria-label="Local AI setup status">
+        <StatusPill
+          label="Search index"
+          tone={aiReadiness.searchTone}
+          value={aiReadiness.searchLabel}
+          detail={aiReadiness.searchDetail}
+        />
+        <StatusPill
+          label="Chat model"
+          tone={aiReadiness.chatTone}
+          value={aiReadiness.chatLabel}
+          detail={aiReadiness.chatDetail}
+        />
+        <StatusPill
+          label="Current activity"
+          tone={aiReadiness.activityTone}
+          value={aiReadiness.activityLabel}
+          detail={aiReadiness.activityDetail}
+        />
+      </div>
+
+      <div className="knowledge-graph-stage">
         <div className="knowledge-graph-container knowledge-graph-canvas-wrap">
           {loading ? (
             <div className="knowledge-graph-empty knowledge-graph-empty--nexus">
@@ -392,157 +518,283 @@ export function KnowledgeGraphPanel() {
           ) : null}
         </div>
 
-        <div className="knowledge-search-panel knowledge-search-panel--nexus">
-          <p className="knowledge-search-heading">Ask your browsing history</p>
+        {openFlyout !== null ? (
+          <button
+            type="button"
+            className="knowledge-flyout-backdrop"
+            aria-label="Close panel"
+            onClick={closeFlyout}
+          />
+        ) : null}
 
-          <div className="knowledge-search-row">
-            <input
-              type="search"
-              className="knowledge-search-input knowledge-search-input--nexus"
-              placeholder="Where did I see that local knowledge graph tool?"
-              value={query}
-              onChange={handleQueryChange}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void runSearch(query);
-              }}
-            />
-            <button
-              type="button"
-              className="button knowledge-graph-find-btn"
-              onClick={() => void runSearch(query)}
-              disabled={searching || !query.trim()}
-            >
-              {searching ? "…" : "Find"}
-            </button>
-          </div>
+        <div className="knowledge-fab-stack" aria-label="Knowledge graph tools">
+          <button
+            type="button"
+            className={`knowledge-fab knowledge-fab--search${openFlyout === "search" ? " is-active" : ""}`}
+            aria-label="Search browsing history"
+            aria-expanded={openFlyout === "search"}
+            onClick={() => toggleFlyout("search")}
+          >
+            <SearchFabIcon />
+          </button>
+          <button
+            type="button"
+            className={`knowledge-fab knowledge-fab--chat${openFlyout === "chat" ? " is-active" : ""}`}
+            aria-label="Open conversation"
+            aria-expanded={openFlyout === "chat"}
+            onClick={() => toggleFlyout("chat")}
+          >
+            <ChatFabIcon />
+          </button>
+        </div>
 
-          <div className="knowledge-search-results">
-            {results.length > 0
-              ? results.map((result) => (
-                  <article key={result.url} className="knowledge-result-card knowledge-result-card--nexus">
-                    <div className="knowledge-result-header">
-                      <img
-                        src={`https://www.google.com/s2/favicons?domain=${result.hostname}&sz=16`}
-                        alt=""
-                        width={16}
-                        height={16}
-                        className="knowledge-result-favicon"
-                      />
-                      <div className="knowledge-result-meta">
-                        <strong>{result.title || result.hostname}</strong>
-                        <span>{result.hostname}</span>
-                        {urlPath(result.url) ? (
-                          <span className="knowledge-result-path">{urlPath(result.url)}</span>
+        {openFlyout === "search" ? (
+          <aside className="knowledge-flyout knowledge-flyout--search" aria-label="Search panel">
+            <div className="knowledge-flyout-header">
+              <h3>Search</h3>
+              <button type="button" className="knowledge-flyout-close" onClick={closeFlyout}>
+                Close
+              </button>
+            </div>
+            <div className="knowledge-flyout-body">
+              <section className="knowledge-side-section">
+                <div className="knowledge-panel-heading-row">
+                  <div>
+                    <p className="knowledge-search-heading">Search your browsing history</p>
+                    <p className="knowledge-panel-subcopy">Find pages by topic, site, title, or remembered snippets.</p>
+                  </div>
+                  {results.length > 0 ? (
+                    <span className="ai-mini-badge ai-mini-badge--ready">{results.length} hits</span>
+                  ) : null}
+                </div>
+
+                <div className="knowledge-search-row">
+                  <input
+                    ref={searchInputRef}
+                    type="search"
+                    className="knowledge-search-input knowledge-search-input--nexus"
+                    placeholder="Example: diamonds, LinkedIn, local AI, YouTube…"
+                    value={query}
+                    onChange={handleQueryChange}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void runSearch(query);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="button knowledge-graph-find-btn"
+                    onClick={() => void runSearch(query)}
+                    disabled={searching || !query.trim()}
+                  >
+                    {searching ? "Searching" : "Find"}
+                  </button>
+                </div>
+
+                {!hasSearched ? (
+                  <div className="knowledge-suggestion-row" aria-label="Suggested searches">
+                    {SUGGESTED_SEARCHES.map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        className="knowledge-suggestion-chip"
+                        onClick={() => runSuggestedSearch(suggestion)}
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+
+                <div className="knowledge-search-results knowledge-search-results--pages">
+                  {results.length > 0
+                    ? results.map((result) => (
+                      <article key={result.url} className="knowledge-result-card knowledge-result-card--nexus">
+                        <div className="knowledge-result-header">
+                          <img
+                            src={`https://www.google.com/s2/favicons?domain=${result.hostname}&sz=16`}
+                            alt=""
+                            width={16}
+                            height={16}
+                            className="knowledge-result-favicon"
+                          />
+                          <div className="knowledge-result-meta">
+                            <strong>{result.title || result.hostname}</strong>
+                            <span>{result.hostname}</span>
+                            {urlPath(result.url) ? (
+                              <span className="knowledge-result-path">{urlPath(result.url)}</span>
+                            ) : null}
+                          </div>
+                          <a href={result.url} target="_blank" rel="noreferrer" className="button knowledge-result-open">
+                            Open
+                          </a>
+                        </div>
+                        {result.snippet ? (
+                          <p className="knowledge-result-snippet">{result.snippet}</p>
                         ) : null}
-                      </div>
-                      <a href={result.url} target="_blank" rel="noreferrer" className="button knowledge-result-open">
-                        Open
-                      </a>
+                        {result.reasons.length > 0 ? (
+                          <p className="knowledge-result-date">
+                            {result.reasons.map((reason) => reasonLabel(reason)).join(" · ")}
+                          </p>
+                        ) : null}
+                        <small className="knowledge-result-date">{formatDate(result.lastVisited)}</small>
+                      </article>
+                      ))
+                    : hasSearched && !searching
+                      ? (
+                        <div className="knowledge-empty-state">
+                          <strong>No matching pages found.</strong>
+                          <p>Try a broader word, a hostname, or browse the page again so the extension can index it.</p>
+                        </div>
+                      )
+                      : (
+                        <div className="knowledge-empty-state">
+                          <strong>Start with search.</strong>
+                          <p>Search results become the strongest context for conversation.</p>
+                        </div>
+                      )}
+                </div>
+              </section>
+            </div>
+          </aside>
+        ) : null}
+
+        {openFlyout === "chat" ? (
+          <aside className="knowledge-flyout knowledge-flyout--chat" aria-label="Conversation panel">
+            <div className="knowledge-flyout-header">
+              <h3>Conversation</h3>
+              <button type="button" className="knowledge-flyout-close" onClick={closeFlyout}>
+                Close
+              </button>
+            </div>
+            <div className="knowledge-flyout-body">
+              <section className="knowledge-side-section knowledge-side-section--chat">
+                <div className="knowledge-panel-heading-row">
+                  <div>
+                    <p className="knowledge-search-heading">Ask about your graph</p>
+                    <p className="knowledge-panel-subcopy">
+                      Answers stay local and use your browsing graph context.
+                    </p>
+                  </div>
+                  <div className="knowledge-chat-heading-actions">
+                    <span className={`ai-mini-badge ai-mini-badge--${aiReadiness.chatTone}`}>
+                      {aiReadiness.chatLabel}
+                    </span>
+                    <button
+                      type="button"
+                      className="knowledge-chat-history-toggle"
+                      onClick={() => setIsChatHistoryOpen((current) => !current)}
+                    >
+                      {activeChat ? truncateChatTitle(activeChat.title) : "Chats"}
+                    </button>
+                  </div>
+                </div>
+                {isChatHistoryOpen ? (
+                  <div ref={chatHistoryMenuRef} className="knowledge-chat-history-menu">
+                    <div className="knowledge-chat-history-actions">
+                      <button type="button" className="knowledge-chat-action-btn" onClick={createNewChat}>
+                        New chat
+                      </button>
+                      <button type="button" className="knowledge-chat-action-btn" onClick={clearCurrentChat}>
+                        Clear chat
+                      </button>
                     </div>
-                    {result.snippet ? (
-                      <p className="knowledge-result-snippet">{result.snippet}</p>
-                    ) : null}
-                    {result.reasons.length > 0 ? (
-                      <p className="knowledge-result-date">
-                        {result.reasons.map((reason) => reasonLabel(reason)).join(" · ")}
-                      </p>
-                    ) : null}
-                    <small className="knowledge-result-date">{formatDate(result.lastVisited)}</small>
-                  </article>
-                ))
-              : hasSearched && !searching
-                ? (
-                  <p className="empty-copy knowledge-empty-copy">No matching pages found. Try different keywords.</p>
-                )
-                : (
-                  <p className="empty-copy knowledge-empty-copy">
-                    Type something you remember — a topic, a tool name, or a concept. We&apos;ll find the page.
+                    <div className="knowledge-chat-history-list">
+                      {chatThreads.map((thread) => (
+                        <button
+                          key={thread.id}
+                          type="button"
+                          className={`knowledge-chat-history-item${thread.id === activeChat?.id ? " is-active" : ""}`}
+                          onClick={() => selectChat(thread.id)}
+                        >
+                          <strong>{truncateChatTitle(thread.title)}</strong>
+                          <small>{new Date(thread.updatedAt).toLocaleString()}</small>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+                {results.length > 0 ? (
+                  <p className="knowledge-context-note">
+                    Using {results.length} current search result{results.length === 1 ? "" : "s"} as context.
+                  </p>
+                ) : (
+                  <p className="knowledge-context-note">
+                    Tip: search improves grounding. This chat also remembers context inside each thread.
                   </p>
                 )}
-          </div>
-
-          <div className="knowledge-search-results">
-            <p className="knowledge-search-heading">Conversation (local SLM)</p>
-            <div className="knowledge-search-results">
-              {chatHistory.length === 0 ? (
-                <p className="empty-copy knowledge-empty-copy">
-                  Ask follow-up questions after search. Replies stay local and use retrieved snippets.
-                </p>
-              ) : (
-                chatHistory.map((message, index) => (
-                  <article key={`${message.role}-${index}`} className="knowledge-result-card knowledge-result-card--nexus">
-                    <small className="knowledge-result-date">{message.role === "user" ? "You" : "Local AI"}</small>
-                    <p className="knowledge-result-snippet">{message.content}</p>
-                  </article>
-                ))
-              )}
+                <div className="knowledge-chat-thread" aria-live="polite">
+                  {chatHistory.length === 0 ? (
+                    <div className="knowledge-empty-state">
+                      <strong>Start chatting naturally.</strong>
+                      <p>
+                        Example: “My name is Deepak”, then ask “What is my name?” in the same thread.
+                      </p>
+                    </div>
+                  ) : (
+                    chatHistory.map((message, index) => (
+                      <article
+                        key={`${message.role}-${index}`}
+                        className={`knowledge-chat-message knowledge-chat-message--${message.role}`}
+                      >
+                        <small>{message.role === "user" ? "You" : "Local AI"}</small>
+                        <p>{message.content}</p>
+                      </article>
+                    ))
+                  )}
+                  {isChatLoading ? (
+                    <article className="knowledge-chat-message knowledge-chat-message--assistant">
+                      <small>Local AI</small>
+                      <p>Thinking with your local browsing graph…</p>
+                    </article>
+                  ) : null}
+                </div>
+                <div className="knowledge-search-row">
+                  <input
+                    ref={chatInputRef}
+                    type="text"
+                    className="knowledge-search-input knowledge-search-input--nexus"
+                    placeholder="Ask about pages you visited…"
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") void sendChat();
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="button knowledge-graph-find-btn"
+                    onClick={() => void sendChat()}
+                    disabled={isChatLoading || !chatInput.trim()}
+                  >
+                    {isChatLoading ? "…" : "Ask"}
+                  </button>
+                </div>
+              </section>
             </div>
-            <div className="knowledge-search-row">
-              <input
-                type="text"
-                className="knowledge-search-input knowledge-search-input--nexus"
-                placeholder="Ask a follow-up question…"
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") void sendChat();
-                }}
-              />
-              <button
-                type="button"
-                className="button knowledge-graph-find-btn"
-                onClick={() => void sendChat()}
-                disabled={chatLoading || !chatInput.trim()}
-              >
-                {chatLoading ? "…" : "Ask"}
-              </button>
-            </div>
-          </div>
-
-          <div className="knowledge-search-results">
-            <p className="knowledge-search-heading">Knowledge graph transfer</p>
-            <p className="empty-copy knowledge-empty-copy">
-              Export saves only your local graph data. Import re-indexes embeddings on-device after load.
-            </p>
-            <div className="knowledge-search-row">
-              <button
-                type="button"
-                className="button knowledge-graph-find-btn"
-                onClick={() => void exportKnowledge()}
-                disabled={transferBusy}
-              >
-                Export graph
-              </button>
-              <label className="knowledge-graph-label-toggle">
-                <input
-                  type="radio"
-                  name="importMode"
-                  checked={importMode === "merge"}
-                  onChange={() => setImportMode("merge")}
-                />
-                <span>Merge</span>
-              </label>
-              <label className="knowledge-graph-label-toggle">
-                <input
-                  type="radio"
-                  name="importMode"
-                  checked={importMode === "replace"}
-                  onChange={() => setImportMode("replace")}
-                />
-                <span>Replace all</span>
-              </label>
-              <input
-                type="file"
-                accept=".json,.stw.json"
-                onChange={(event) => void importKnowledge(event)}
-                disabled={transferBusy}
-              />
-            </div>
-            {transferMessage ? <p className="knowledge-result-date">{transferMessage}</p> : null}
-          </div>
-        </div>
+          </aside>
+        ) : null}
       </div>
     </section>
+  );
+}
+
+function SearchFabIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" width={22} height={22} fill="none" stroke="currentColor" strokeWidth={2.2}>
+      <circle cx="11" cy="11" r="7" />
+      <path d="M20 20l-3.6-3.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ChatFabIcon() {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" width={22} height={22} fill="none" stroke="currentColor" strokeWidth={2.2}>
+      <path
+        d="M5 6.5h14a2 2 0 0 1 2 2v6.5a2 2 0 0 1-2 2H10l-4.5 3V8.5a2 2 0 0 1 2-2Z"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }
 
@@ -583,6 +835,142 @@ function reasonLabel(reason: SemanticReason): string {
       return "Frequent page";
     default: {
       const exhaustiveCheck: never = reason;
+      return exhaustiveCheck;
+    }
+  }
+}
+
+function isGreeting(value: string): boolean {
+  return /^(hi|hello|hey|yo|sup|namaste|hola)[!. ]*$/i.test(value.trim());
+}
+
+type StatusTone = "idle" | "working" | "ready" | "warning" | "error";
+
+type AiReadiness = {
+  searchTone: StatusTone;
+  searchLabel: string;
+  searchDetail: string;
+  chatTone: StatusTone;
+  chatLabel: string;
+  chatDetail: string;
+  activityTone: StatusTone;
+  activityLabel: string;
+  activityDetail: string;
+};
+
+function StatusPill({
+  label,
+  value,
+  detail,
+  tone
+}: {
+  label: string;
+  value: string;
+  detail: string;
+  tone: StatusTone;
+}) {
+  return (
+    <article className={`ai-status-card ai-status-card--${tone}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+      <p>{detail}</p>
+    </article>
+  );
+}
+
+function getAiReadiness(status: AiSetupStatus): AiReadiness {
+  switch (status.phase) {
+    case "idle":
+      return {
+        searchTone: "idle",
+        searchLabel: "Waiting",
+        searchDetail: "Browse a few pages to build a searchable index.",
+        chatTone: "idle",
+        chatLabel: "Waiting",
+        chatDetail: "Chat starts after search is ready.",
+        activityTone: "idle",
+        activityLabel: "Not started",
+        activityDetail: status.message
+      };
+    case "downloading_embed":
+      return {
+        searchTone: "working",
+        searchLabel: "Preparing",
+        searchDetail: "Downloading the local embedding model once.",
+        chatTone: "idle",
+        chatLabel: "Waiting",
+        chatDetail: "Chat starts after indexing completes.",
+        activityTone: "working",
+        activityLabel: "Downloading embeddings",
+        activityDetail: status.message
+      };
+    case "indexing":
+      return {
+        searchTone: "working",
+        searchLabel: `${status.progressPct ?? 0}% indexed`,
+        searchDetail:
+          status.current !== null && status.total !== null
+            ? `${status.current}/${status.total} pages embedded locally.`
+            : "Embedding your saved pages locally.",
+        chatTone: "idle",
+        chatLabel: "Waiting",
+        chatDetail: "Chat starts after semantic search is ready.",
+        activityTone: "working",
+        activityLabel: "Indexing pages",
+        activityDetail: status.message
+      };
+    case "ready_search":
+      return {
+        searchTone: "ready",
+        searchLabel: "Ready",
+        searchDetail: "Semantic search is available.",
+        chatTone: status.message.toLowerCase().includes("fallback") ? "warning" : "idle",
+        chatLabel: status.message.toLowerCase().includes("fallback") ? "Snippet fallback" : "Not loaded",
+        chatDetail: status.message.toLowerCase().includes("fallback")
+          ? "Answers use retrieved snippets because the chat model is unavailable."
+          : "Ask a question to prepare the local chat model.",
+        activityTone: "ready",
+        activityLabel: "Search ready",
+        activityDetail: status.message
+      };
+    case "downloading_slm":
+      return {
+        searchTone: "ready",
+        searchLabel: "Ready",
+        searchDetail: "Semantic search is available while chat prepares.",
+        chatTone: "working",
+        chatLabel: "Preparing",
+        chatDetail: "Loading the optional local conversation model.",
+        activityTone: "working",
+        activityLabel: "Preparing chat",
+        activityDetail: status.message
+      };
+    case "ready_chat":
+      return {
+        searchTone: "ready",
+        searchLabel: "Ready",
+        searchDetail: "Semantic search is available.",
+        chatTone: "ready",
+        chatLabel: "Ready",
+        chatDetail: "The local conversation model is available.",
+        activityTone: "ready",
+        activityLabel: "All local AI ready",
+        activityDetail: status.message
+      };
+    case "error":
+      return {
+        searchTone: "error",
+        searchLabel: "Needs attention",
+        searchDetail: "Search setup hit an error. Reload the extension and dashboard.",
+        chatTone: "warning",
+        chatLabel: "Fallback only",
+        chatDetail: "Chat can still answer from snippets if search works.",
+        activityTone: "error",
+        activityLabel: "Error",
+        activityDetail: status.message
+      };
+    default: {
+      const exhaustiveCheck: never = status.phase;
       return exhaustiveCheck;
     }
   }
