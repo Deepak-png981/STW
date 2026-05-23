@@ -98,14 +98,14 @@ chrome.runtime.onInstalled.addListener((details) => {
 });
 
 chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendResponse) => {
-  console.log("[STW] background: received message type =", message.type);
+  console.log(" background: received message type =", message.type);
   void handleRuntimeMessage(message, sender)
     .then((response) => {
-      console.log("[STW] background: responding to", message.type, "ok =", (response as { ok?: boolean }).ok);
+      console.log("background: responding to", message.type, "ok =", (response as { ok?: boolean }).ok);
       sendResponse(response);
     })
     .catch((error: unknown) => {
-      console.error("[STW] background: handler threw for", message.type, error);
+      console.error("background: handler threw for", message.type, error);
       sendResponse(
         createBridgeErrorResponse(
           message,
