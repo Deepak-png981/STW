@@ -131,7 +131,7 @@ export const DEFAULT_AI_SETUP_STATUS: AiSetupStatus = {
   updatedAt: new Date(0).toISOString()
 };
 export const EXTENSION_INSTALL_URL =
-  "https://github.com/deepak-io/shame_the_web/releases/latest" as const;
+  "https://chromewebstore.google.com/detail/shame-the-web/eklnjfgicliilcojmnphoaacphjihbhp" as const;
 
 export type UserProfile = {
   id: string;
