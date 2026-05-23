@@ -112,7 +112,7 @@ describe("dashboard display helpers", () => {
     );
 
     expect(trend).toEqual([{ hostname: "new.test", score: 95 }]);
-    expect(formatScore(undefined)).toBe("—");
+    expect(formatScore(undefined)).toBe("N/A");
     expect(formatScore(106)).toBe("100 / 100");
     expect(formatTiming(undefined)).toBe("Not enough data");
     expect(formatTiming(2800)).toBe("2.8s");
