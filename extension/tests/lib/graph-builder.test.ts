@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { PageContent, VisitRecord } from "@shame-the-web/shared";
 
-import { buildKnowledgeGraph } from "./graph-builder";
+import { buildKnowledgeGraph } from "../../src/lib/graph-builder";
 
 const baseVisit: Omit<VisitRecord, "id" | "url" | "title" | "hostname" | "timestamp"> = {
   userId: "u1",

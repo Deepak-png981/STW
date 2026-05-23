@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { PageContent } from "@shame-the-web/shared";
 
-import { searchPages, tokenize } from "./tfidf";
+import { searchPages, tokenize } from "../../src/lib/tfidf";
 
 describe("tokenize", () => {
   it("allows shorter query tokens when minLength is 2", () => {

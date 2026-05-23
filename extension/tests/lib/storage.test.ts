@@ -8,7 +8,7 @@ import {
   getRecentRoastTemplateIds,
   loginUser,
   rememberRoastTemplate
-} from "./storage";
+} from "../../src/lib/storage";
 
 function createMemoryDriver(initial = getInitialState()) {
   let state = initial;

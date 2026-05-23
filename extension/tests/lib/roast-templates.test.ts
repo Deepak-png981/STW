@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getRoastCategory, pickRoast, roastTemplates } from "./roast-templates";
+import { getRoastCategory, pickRoast, roastTemplates } from "../../src/lib/roast-templates";
 
 describe("roast engine", () => {
   it("maps score bands to playful roast categories", () => {

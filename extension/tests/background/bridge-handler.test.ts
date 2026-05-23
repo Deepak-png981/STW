@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { SHAME_THE_WEB_BRIDGE_SOURCE } from "@shame-the-web/shared";
 import type { BridgeRequest, StoredState } from "@shame-the-web/shared";
 
-import { handleBridgeRequest } from "./bridge-handler";
+import { handleBridgeRequest } from "../../src/background/bridge-handler";
 
 type SimpleRequestType = "ping" | "getSession" | "getVisits" | "getStats" | "getRoasts" | "getKnowledgeGraph";
 

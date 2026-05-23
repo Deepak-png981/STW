@@ -6,7 +6,7 @@ import {
   mergeImportedVisits,
   mergePageContents,
   parseKnowledgeImport
-} from "./knowledge-transfer";
+} from "../../src/lib/knowledge-transfer";
 
 const pages: PageContent[] = [
   {

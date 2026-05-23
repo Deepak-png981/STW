@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { designTokens, designTokensAsCssVariables, SHAME_THE_WEB_DASHBOARD_ORIGINS } from "./design-tokens";
+import { designTokens, designTokensAsCssVariables, SHAME_THE_WEB_DASHBOARD_ORIGINS } from "../src/design-tokens";
 
 describe("design tokens", () => {
   it("keeps core colors aligned with design profile", () => {

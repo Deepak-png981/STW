@@ -8,7 +8,7 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 
-import { extractPageContent } from "./content-extractor";
+import { extractPageContent } from "../../src/lib/content-extractor";
 
 afterEach(() => {
   document.head.innerHTML = "";

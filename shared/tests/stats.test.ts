@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { VisitRecord } from "./index";
-import { summarizeVisits } from "./stats";
+import type { VisitRecord } from "@shame-the-web/shared";
+import { summarizeVisits } from "../src/stats";
 
 function visit(hostname: string, speedScore100: number): VisitRecord {
   return {

@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("./local-embeddings", () => ({
+vi.mock("../../src/lib/local-embeddings", () => ({
   embedText: async () => [1, 0, 0, 0]
 }));
 
 import type { ChunkEmbedding, KnowledgeChunk, KnowledgeGraph, PageContent } from "@shame-the-web/shared";
-import { semanticSearchPages } from "./semantic-search";
+import { semanticSearchPages } from "../../src/lib/semantic-search";
 
 const pages: PageContent[] = [
   {

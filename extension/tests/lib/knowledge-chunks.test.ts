@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { PageContent } from "@shame-the-web/shared";
-import { buildContentHash, buildKnowledgeChunks } from "./knowledge-chunks";
+import { buildContentHash, buildKnowledgeChunks } from "../../src/lib/knowledge-chunks";
 
 const basePage: PageContent = {
   url: "https://example.com/a",

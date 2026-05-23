@@ -11,7 +11,7 @@ import {
   getCoachGrade,
   getRecentTrend,
   getWorstHosts
-} from "./dashboard-helpers";
+} from "../../src/lib/dashboard-helpers";
 
 function visit(input: {
   hostname: string;

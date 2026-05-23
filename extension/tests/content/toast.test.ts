@@ -2,7 +2,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { renderRoastToast, shouldShowToast } from "./toast";
+import { renderRoastToast, shouldShowToast } from "../../src/content/toast";
 
 describe("roast toast", () => {
   it("renders a top-right toast with message and score context", () => {

@@ -23,7 +23,8 @@
     "*.tsx",
     "contents/**/*.ts",
     "tabs/**/*.tsx",
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "tests/**/*.ts"
   ],
   "references": [
     {

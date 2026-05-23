@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateScores, createVisitRecord } from "./scoring";
+import { calculateScores, createVisitRecord } from "../../src/lib/scoring";
 
 describe("performance scoring", () => {
   it("scores fast pages near the top of the 100 point scale", () => {

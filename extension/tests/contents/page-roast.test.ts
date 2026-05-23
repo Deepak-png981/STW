@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { config, runPageRoast } from "./page-roast";
+import { config, runPageRoast } from "../../src/contents/page-roast";
 
 describe("page-roast content script", () => {
   it("registers on normal web pages and excludes dashboard origins", () => {
