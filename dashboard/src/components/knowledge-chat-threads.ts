@@ -77,6 +77,10 @@ function deriveChatTitle(messages: readonly ChatMessage[]): string {
 }
 
 function sortThreads(threads: ChatThread[]): ChatThread[] {
+  return sortThreadsForDisplay(threads);
+}
+
+export function sortThreadsForDisplay(threads: readonly ChatThread[]): ChatThread[] {
   return threads
     .slice()
     .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
