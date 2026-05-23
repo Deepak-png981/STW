@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "..",
+    "types": ["vitest/globals"],
+    "paths": {
+      "@shame-the-web/shared": ["../../shared/src/index.ts"],
+      "@/*": ["../src/*"]
+    }
+  },
+  "include": ["./**/*.ts", "../src/**/*.ts"],
+  "references": [{ "path": "../../shared" }]
+}

@@ -6,9 +6,12 @@ coverage/
 .vercel
 extension/.plasmo/
 extension/build/
+extension/offscreen-dist/
+extension/assets/ort/
 .env.production
 .env.development
 .env.local
 .cursor/
 design.json
 images/
+setup.md

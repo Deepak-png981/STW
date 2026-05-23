@@ -20,10 +20,11 @@ import {
 
 import { HandWrittenTitle } from "./components/ui/hand-writing-text";
 import { NotFoundPage } from "./components/ui/404-page-not-found";
+import { DashboardSettingsPanel } from "./components/DashboardSettingsPanel";
 import { KnowledgeGraphPanel } from "./components/KnowledgeGraphPanel";
 import { PrivacyPage } from "./pages/Privacy";
 
-const DASHBOARD_NAV_IDS = ["dashboard", "scores", "offenders", "education", "history", "knowledge"] as const;
+const DASHBOARD_NAV_IDS = ["dashboard", "scores", "offenders", "education", "history", "knowledge", "settings"] as const;
 type DashboardNavId = (typeof DASHBOARD_NAV_IDS)[number];
 
 function isDashboardNavId(id: string): id is DashboardNavId {
@@ -166,6 +167,9 @@ export function App() {
         case "graphUpdated":
           // Handled inside KnowledgeGraphPanel via its own subscribeBridgeEvents hook.
           return;
+        case "aiSetupProgress":
+          // Handled inside KnowledgeGraphPanel via its own subscribeBridgeEvents hook.
+          return;
         default: {
           const exhaustiveCheck: never = event;
           return exhaustiveCheck;
@@ -265,14 +269,19 @@ function LandingPage() {
             into teachable roast material.
           </p>
           <div className="hero-actions">
-            <Link className="button button-primary" href="/dashboard">
+            <a
+              className="button button-primary"
+              href={EXTENSION_INSTALL_URL}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Add to Chrome
+            </a>
+            <Link className="button button-secondary" href="/dashboard">
               Open Dashboard
             </Link>
-            <Link className="button button-secondary" href="/dashboard#scores">
+            <Link className="button button-ghost" href="/dashboard#scores">
               See Scores
-            </Link>
-            <Link className="button button-ghost" href="/dashboard#history">
-              View Roast History
             </Link>
           </div>
           <p className="hero-microcopy">No spreadsheets. No corporate dashboards. Just scores, roasts, and useful clues.</p>
@@ -308,7 +317,13 @@ function LandingPage() {
           <h2>Browse normally. Let the coach make it weirdly useful.</h2>
         </div>
         <div className="steps-grid">
-          <StepCard number="01" title="Add the extension" copy="Create your local profile and let Shame The Web keep score while you browse." />
+          <StepCard
+            number="01"
+            title="Add the extension"
+            copy="Install from the Chrome Web Store, create your local profile, and let Shame The Web keep score while you browse."
+            href={EXTENSION_INSTALL_URL}
+            linkLabel="Add to Chrome"
+          />
           <StepCard number="02" title="Use the web normally" copy="No special tests. The product watches real pages during real browsing." />
           <StepCard number="03" title="Every visit gets judged" copy="Speed, responsiveness, stability, and polish roll up into a simple score." />
           <StepCard number="04" title="Roasts become coaching" copy="The dashboard explains what went wrong and which sites deserve another look." />
@@ -317,12 +332,14 @@ function LandingPage() {
 
       <section className="trust-card" id="extension">
         <div>
-          <p className="eyebrow">Local dashboard context</p>
-          <h2>Built around your recent Shame The Web profile.</h2>
+          <p className="eyebrow">Chrome extension</p>
+          <h2>Install Shame The Web in your browser.</h2>
           <p>
-            The dashboard focuses on performance signals, scores, and roast history instead of turning your browsing
-            into an enterprise report.
+            Get speed roasts and a private, local knowledge graph of pages you visit. Everything stays on your device.
           </p>
+          <a className="button button-primary" href={EXTENSION_INSTALL_URL} target="_blank" rel="noreferrer">
+            Add to Chrome
+          </a>
         </div>
         <div className="trust-meta">
           <span className="status-bar">Local-first experience</span>
@@ -399,12 +416,18 @@ function Dashboard({
     };
   }, []);
 
+  const isKnowledgeView = activeNavId === "knowledge";
+
   return (
     <section className="dashboard-frame" id="dashboard">
-      <div className="dashboard-shell">
+      <div className={`dashboard-shell${isKnowledgeView ? " dashboard-shell--immersive" : ""}`}>
         <DashboardSidebar activeNavId={activeNavId} onSelectPanel={goToPanel} />
 
-        <div ref={canvasRef} className="dashboard-canvas" role="main">
+        <div
+          ref={canvasRef}
+          className={`dashboard-canvas${isKnowledgeView ? " dashboard-canvas--immersive" : ""}`}
+          role="main"
+        >
           {activeNavId === "dashboard" ? (
             <>
           <header className="dashboard-header">
@@ -421,9 +444,9 @@ function Dashboard({
                 <p>
                   Extension missing?{" "}
                   <a href={EXTENSION_INSTALL_URL} target="_blank" rel="noreferrer">
-                    Install from latest release
+                    Add to Chrome
                   </a>{" "}
-                  and load unpacked in Chrome developer mode.
+                  from the Web Store.
                 </p>
               ) : null}
             </div>
@@ -670,6 +693,7 @@ function Dashboard({
           ) : null}
 
           {activeNavId === "knowledge" ? <KnowledgeGraphPanel /> : null}
+          {activeNavId === "settings" ? <DashboardSettingsPanel /> : null}
         </div>
       </div>
     </section>
@@ -735,6 +759,13 @@ function DashboardSidebar({
           >
             Knowledge
           </button>
+          <button
+            type="button"
+            className={activeNavId === "settings" ? "is-active" : undefined}
+            onClick={() => onSelectPanel("settings")}
+          >
+            Settings
+          </button>
         </nav>
       </div>
       <Link className="sidebar-back" href="/" aria-label="Back to landing page">
@@ -762,12 +793,29 @@ function DashboardSidebar({
   );
 }
 
-function StepCard({ number, title, copy }: { number: string; title: string; copy: string }) {
+function StepCard({
+  number,
+  title,
+  copy,
+  href,
+  linkLabel
+}: {
+  number: string;
+  title: string;
+  copy: string;
+  href?: string;
+  linkLabel?: string;
+}) {
   return (
     <article className="step-card">
       <span>{number}</span>
       <h3>{title}</h3>
       <p>{copy}</p>
+      {href && linkLabel ? (
+        <a className="step-card-link" href={href} target="_blank" rel="noreferrer">
+          {linkLabel}
+        </a>
+      ) : null}
     </article>
   );
 }

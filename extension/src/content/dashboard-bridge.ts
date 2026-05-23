@@ -10,6 +10,24 @@ type BridgePushVisitRecorded = {
   visit: VisitRecord;
 };
 
+type BridgePushGraphUpdated = {
+  source: typeof SHAME_THE_WEB_EXTENSION_SOURCE;
+  event: "graphUpdated";
+  nodeCount: number;
+};
+
+type BridgePushAiSetupProgress = {
+  source: typeof SHAME_THE_WEB_EXTENSION_SOURCE;
+  event: "aiSetupProgress";
+  status: {
+    phase: string;
+    message: string;
+    updatedAt: string;
+  };
+};
+
+type BridgePushEvent = BridgePushVisitRecorded | BridgePushGraphUpdated | BridgePushAiSetupProgress;
+
 const CONTEXT_INVALID_HINT =
   "Extension was updated or reloaded. Refresh this page to reconnect.";
 
@@ -55,7 +73,7 @@ chrome.runtime.onMessage.addListener((message: unknown) => {
     return;
   }
 
-  if (!isBridgePushVisitRecorded(message)) {
+  if (!isBridgePushEvent(message)) {
     return;
   }
 
@@ -114,20 +132,37 @@ function isDashboardRequest(message: unknown): message is BridgeRequest {
       candidate.type === "getStats" ||
       candidate.type === "getRoasts" ||
       candidate.type === "getKnowledgeGraph" ||
-      (candidate.type === "searchKnowledge" && typeof (candidate as { query?: unknown }).query === "string"))
+      candidate.type === "getAiSetupStatus" ||
+      candidate.type === "exportKnowledgeGraph" ||
+      (candidate.type === "importKnowledgeGraph" &&
+        typeof (candidate as { fileContents?: unknown }).fileContents === "string" &&
+        ((candidate as { mode?: unknown }).mode === "merge" || (candidate as { mode?: unknown }).mode === "replace")) ||
+      (candidate.type === "searchKnowledge" && typeof (candidate as { query?: unknown }).query === "string") ||
+      (candidate.type === "semanticSearchKnowledge" && typeof (candidate as { query?: unknown }).query === "string") ||
+      (candidate.type === "chatKnowledge" &&
+        typeof (candidate as { query?: unknown }).query === "string" &&
+        typeof (candidate as { sessionId?: unknown }).sessionId === "string" &&
+        Array.isArray((candidate as { history?: unknown }).history)))
   );
 }
 
-function isBridgePushVisitRecorded(message: unknown): message is BridgePushVisitRecorded {
+function isBridgePushEvent(message: unknown): message is BridgePushEvent {
   if (!message || typeof message !== "object") {
     return false;
   }
 
-  const candidate = message as Partial<BridgePushVisitRecorded>;
-  return (
-    candidate.source === SHAME_THE_WEB_EXTENSION_SOURCE &&
-    candidate.event === "visitRecorded" &&
-    !!candidate.visit &&
-    typeof candidate.visit === "object"
-  );
+  const candidate = message as Record<string, unknown>;
+  if (candidate["source"] !== SHAME_THE_WEB_EXTENSION_SOURCE) {
+    return false;
+  }
+  if (candidate["event"] === "visitRecorded") {
+    return !!candidate["visit"] && typeof candidate["visit"] === "object";
+  }
+  if (candidate["event"] === "graphUpdated") {
+    return typeof candidate["nodeCount"] === "number";
+  }
+  if (candidate["event"] === "aiSetupProgress") {
+    return !!candidate["status"] && typeof candidate["status"] === "object";
+  }
+  return false;
 }

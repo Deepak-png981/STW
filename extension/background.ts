@@ -1,20 +1,40 @@
 import {
+  type AiSetupStatus,
   SHAME_THE_WEB_EXTENSION_SOURCE,
   SHAME_THE_WEB_DASHBOARD_ORIGINS
 } from "@shame-the-web/shared";
 import type { BridgeRequest, BridgeResponse, ScoreBand, VisitRecord } from "@shame-the-web/shared";
 
 import { handleBridgeRequest } from "./src/background/bridge-handler";
-import { appendVisit, chromeStorageDriver, getState, rememberRoastTemplate } from "./src/lib/storage";
+import { appendVisit, chromeStorageDriver, getState, rememberRoastTemplate, setState } from "./src/lib/storage";
 import { buildKnowledgeGraph } from "./src/lib/graph-builder";
 import {
+  clearAllChunkEmbeddings,
+  clearAllKnowledgeChunks,
   getAllPageContents,
   getStoredKnowledgeGraph,
+  setAllPageContents,
   storeKnowledgeGraph,
   storePageContent
 } from "./src/lib/content-storage";
 import { searchPages } from "./src/lib/tfidf";
 import type { RawPageContent } from "./src/lib/content-extractor";
+import {
+  answerFromLocalKnowledge,
+  ensureConversationReady,
+  ensureSearchReady,
+  getAiSetupStatus as getCurrentAiSetupStatus,
+  runSemanticSearch
+} from "./src/lib/ai-setup";
+import { logChatDebug, summarizeSearchResults } from "./src/lib/chat-debug";
+import { describeGroundingDecision, selectChatGroundingResults } from "./src/lib/chat-grounding";
+import { ensureOffscreenDocument } from "./src/lib/offscreen-runtime";
+import {
+  buildKnowledgeExport,
+  mergeImportedVisits,
+  mergePageContents,
+  parseKnowledgeImport
+} from "./src/lib/knowledge-transfer";
 
 type RecordVisitMessage = {
   type: "recordVisit";
@@ -33,6 +53,19 @@ type StorePageContentMessage = {
 type RuntimeMessage = BridgeRequest | RecordVisitMessage | StorePageContentMessage;
 
 let rebuildTimer: ReturnType<typeof setTimeout> | null = null;
+let aiSetupTimer: ReturnType<typeof setTimeout> | null = null;
+const AI_LOG_PREFIX = "[STW][background AI]";
+
+function scheduleAiSetup(delayMs = 1000): void {
+  console.info(AI_LOG_PREFIX, "scheduleAiSetup", { delayMs, alreadyScheduled: aiSetupTimer !== null });
+  if (aiSetupTimer !== null) {
+    clearTimeout(aiSetupTimer);
+  }
+  aiSetupTimer = setTimeout(() => {
+    aiSetupTimer = null;
+    void runAiSetupInBackground();
+  }, delayMs);
+}
 
 function scheduleGraphRebuild(): void {
   if (rebuildTimer !== null) {
@@ -58,6 +91,7 @@ function scheduleGraphRebuild(): void {
 }
 
 chrome.runtime.onInstalled.addListener((details) => {
+  scheduleAiSetup(0);
   if (details.reason !== "install") {
     return;
   }
@@ -66,14 +100,14 @@ chrome.runtime.onInstalled.addListener((details) => {
 });
 
 chrome.runtime.onMessage.addListener((message: RuntimeMessage, sender, sendResponse) => {
-  console.log("[STW] background: received message type =", message.type);
+  console.log(" background: received message type =", message.type);
   void handleRuntimeMessage(message, sender)
     .then((response) => {
-      console.log("[STW] background: responding to", message.type, "ok =", (response as { ok?: boolean }).ok);
+      console.log("background: responding to", message.type, "ok =", (response as { ok?: boolean }).ok);
       sendResponse(response);
     })
     .catch((error: unknown) => {
-      console.error("[STW] background: handler threw for", message.type, error);
+      console.error("background: handler threw for", message.type, error);
       sendResponse(
         createBridgeErrorResponse(
           message,
@@ -89,6 +123,10 @@ async function handleRuntimeMessage(
   message: RuntimeMessage,
   sender: chrome.runtime.MessageSender
 ): Promise<BridgeResponse | { ok: true }> {
+  if (message.type === "ping") {
+    scheduleAiSetup(0);
+  }
+
   if (message.type === "recordVisit") {
     await appendVisit(chromeStorageDriver, message.visit);
     await rememberRoastTemplate(chromeStorageDriver, {
@@ -111,6 +149,7 @@ async function handleRuntimeMessage(
       throw err;
     }
     scheduleGraphRebuild();
+    scheduleAiSetup(1500);
     return { ok: true };
   }
 
@@ -146,6 +185,149 @@ async function handleRuntimeMessage(
       ok: true,
       type: "searchKnowledge",
       data: { results }
+    };
+  }
+
+  if (message.type === "getAiSetupStatus") {
+    return {
+      id: message.id,
+      source: SHAME_THE_WEB_EXTENSION_SOURCE,
+      ok: true,
+      type: "getAiSetupStatus",
+      data: { status: getCurrentAiSetupStatus() }
+    };
+  }
+
+  if (message.type === "semanticSearchKnowledge") {
+    console.info(AI_LOG_PREFIX, "semanticSearchKnowledge:start", { queryLength: message.query.length });
+    const startedAt = performance.now();
+    const [pages, graph] = await Promise.all([getAllPageContents(), getStoredKnowledgeGraph()]);
+    await ensureSearchReady(pages, (status) => {
+      void broadcastAiSetupProgress(status);
+    });
+    const results = await runSemanticSearch({
+      query: message.query,
+      pages,
+      graph
+    });
+    console.info(AI_LOG_PREFIX, "semanticSearchKnowledge:done", {
+      pageCount: pages.length,
+      resultCount: results.length,
+      durationMs: Math.round(performance.now() - startedAt)
+    });
+    return {
+      id: message.id,
+      source: SHAME_THE_WEB_EXTENSION_SOURCE,
+      ok: true,
+      type: "semanticSearchKnowledge",
+      data: { results }
+    };
+  }
+
+  if (message.type === "chatKnowledge") {
+    console.info(AI_LOG_PREFIX, "chatKnowledge:start", {
+      queryLength: message.query.length,
+      historyLength: message.history.length
+    });
+    const startedAt = performance.now();
+    const [pages, graph] = await Promise.all([getAllPageContents(), getStoredKnowledgeGraph()]);
+    await ensureSearchReady(pages, (status) => {
+      void broadcastAiSetupProgress(status);
+    });
+    const rawResults = await runSemanticSearch({
+      query: message.query,
+      pages,
+      graph
+    });
+    logChatDebug("background:chat-retrieval", {
+      chatQuery: message.query,
+      historyLength: message.history.length,
+      decision: describeGroundingDecision(message.query, rawResults),
+      rawResults: summarizeSearchResults(rawResults),
+      groundedResults: summarizeSearchResults(selectChatGroundingResults(rawResults))
+    });
+    await ensureConversationReady((status) => {
+      void broadcastAiSetupProgress(status);
+    });
+    const answer = await answerFromLocalKnowledge({
+      query: message.query,
+      history: message.history,
+      results: rawResults
+    });
+    console.info(AI_LOG_PREFIX, "chatKnowledge:done", {
+      pageCount: pages.length,
+      rawResultCount: rawResults.length,
+      model: answer.model,
+      sourceCount: answer.sources.length,
+      durationMs: Math.round(performance.now() - startedAt)
+    });
+    return {
+      id: message.id,
+      source: SHAME_THE_WEB_EXTENSION_SOURCE,
+      ok: true,
+      type: "chatKnowledge",
+      data: answer
+    };
+  }
+
+  if (message.type === "exportKnowledgeGraph") {
+    const [state, pages, graph] = await Promise.all([
+      getState(chromeStorageDriver),
+      getAllPageContents(),
+      getStoredKnowledgeGraph()
+    ]);
+    const activeUserVisits = state.activeUserId
+      ? state.visits.filter((visit) => visit.userId === state.activeUserId)
+      : state.visits;
+    const exportGraph = graph ?? buildKnowledgeGraph(pages, activeUserVisits);
+    const exported = buildKnowledgeExport({
+      pages,
+      visits: activeUserVisits,
+      graph: exportGraph
+    });
+    return {
+      id: message.id,
+      source: SHAME_THE_WEB_EXTENSION_SOURCE,
+      ok: true,
+      type: "exportKnowledgeGraph",
+      data: {
+        filename: exported.filename,
+        json: exported.json,
+        pageCount: exported.payload.pages.length,
+        edgeCount: exported.payload.graph.edges.length
+      }
+    };
+  }
+
+  if (message.type === "importKnowledgeGraph") {
+    const imported = parseKnowledgeImport(message.fileContents);
+    const [state, existingPages] = await Promise.all([getState(chromeStorageDriver), getAllPageContents()]);
+    const mergedPages = mergePageContents(existingPages, imported.pages, message.mode);
+    const mergedVisits = mergeImportedVisits(state, imported.visits, message.mode);
+
+    await setAllPageContents(mergedPages);
+    await Promise.all([clearAllKnowledgeChunks(), clearAllChunkEmbeddings()]);
+    const graph = buildKnowledgeGraph(mergedPages, mergedVisits);
+    await storeKnowledgeGraph(graph);
+    await setState(chromeStorageDriver, {
+      ...state,
+      visits: mergedVisits
+    });
+    await broadcastGraphUpdated(graph.nodes.length);
+
+    await ensureSearchReady(mergedPages, (status) => {
+      void broadcastAiSetupProgress(status);
+    });
+
+    return {
+      id: message.id,
+      source: SHAME_THE_WEB_EXTENSION_SOURCE,
+      ok: true,
+      type: "importKnowledgeGraph",
+      data: {
+        importedPageCount: mergedPages.length,
+        mode: message.mode
+      }
     };
   }
 
@@ -193,6 +375,51 @@ async function broadcastVisitRecorded(visit: VisitRecord, sourceTabId?: number):
         }
       })
   );
+}
+
+async function broadcastAiSetupProgress(status: AiSetupStatus): Promise<void> {
+  const tabs = await chrome.tabs.query({});
+  await Promise.all(
+    tabs
+      .filter((tab) => tab.id !== undefined && matchesDashboardOrigin(tab.url))
+      .map(async (tab) => {
+        try {
+          await chrome.tabs.sendMessage(tab.id as number, {
+            source: SHAME_THE_WEB_EXTENSION_SOURCE,
+            event: "aiSetupProgress",
+            status
+          });
+        } catch {
+          // Content script may not be ready yet.
+        }
+      })
+  );
+}
+
+async function runAiSetupInBackground(): Promise<void> {
+  const startedAt = performance.now();
+  console.info(AI_LOG_PREFIX, "background setup:start");
+  const hasOffscreen = await ensureOffscreenDocument();
+  if (!hasOffscreen) {
+    console.warn("[STW] background: offscreen document unavailable; falling back to service worker runtime");
+  }
+
+  const pages = await getAllPageContents();
+  console.info(AI_LOG_PREFIX, "background setup:pages", { pageCount: pages.length, hasOffscreen });
+  await ensureSearchReady(pages, (status) => {
+    void broadcastAiSetupProgress(status);
+  });
+
+  // Prime chat model opportunistically after semantic index is ready.
+  if (pages.length > 0 && getCurrentAiSetupStatus().phase === "ready_search") {
+    await ensureConversationReady((status) => {
+      void broadcastAiSetupProgress(status);
+    });
+  }
+  console.info(AI_LOG_PREFIX, "background setup:done", {
+    finalPhase: getCurrentAiSetupStatus().phase,
+    durationMs: Math.round(performance.now() - startedAt)
+  });
 }
 
 function matchesDashboardOrigin(url: string | undefined): boolean {

@@ -1,11 +1,13 @@
-import type { KnowledgeGraph, PageContent } from "@shame-the-web/shared";
+import type { ChunkEmbedding, KnowledgeChunk, KnowledgeGraph, PageContent } from "@shame-the-web/shared";
 import type { RawPageContent } from "./content-extractor";
 import { extractKeywords } from "./tfidf";
 
 const DB_NAME = "shame-the-web-knowledge";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const PAGE_STORE = "pageContent";
 const GRAPH_STORE = "knowledgeGraph";
+const CHUNK_STORE = "knowledgeChunks";
+const EMBEDDING_STORE = "chunkEmbeddings";
 const GRAPH_KEY = "graph";
 const MAX_RECORDS = 5000;
 
@@ -20,6 +22,15 @@ function openDb(): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(GRAPH_STORE)) {
         db.createObjectStore(GRAPH_STORE);
+      }
+      if (!db.objectStoreNames.contains(CHUNK_STORE)) {
+        const chunkStore = db.createObjectStore(CHUNK_STORE, { keyPath: "id" });
+        chunkStore.createIndex("pageUrl", "pageUrl", { unique: false });
+      }
+      if (!db.objectStoreNames.contains(EMBEDDING_STORE)) {
+        const embeddingStore = db.createObjectStore(EMBEDDING_STORE, { keyPath: "id" });
+        embeddingStore.createIndex("pageUrl", "pageUrl", { unique: false });
+        embeddingStore.createIndex("chunkId", "chunkId", { unique: true });
       }
     };
 
@@ -54,6 +65,23 @@ export async function getAllPageContents(): Promise<PageContent[]> {
   });
 }
 
+export async function setAllPageContents(pages: readonly PageContent[]): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(PAGE_STORE, "readwrite");
+    const store = tx.objectStore(PAGE_STORE);
+    const clearReq = store.clear();
+    clearReq.onsuccess = () => {
+      pages.forEach((page) => {
+        store.put(page);
+      });
+    };
+    clearReq.onerror = () => reject(clearReq.error);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
 export async function storeKnowledgeGraph(graph: KnowledgeGraph): Promise<void> {
   const db = await openDb();
   return new Promise((resolve, reject) => {
@@ -70,6 +98,106 @@ export async function getStoredKnowledgeGraph(): Promise<KnowledgeGraph | null> 
     const tx = db.transaction(GRAPH_STORE, "readonly");
     const req = tx.objectStore(GRAPH_STORE).get(GRAPH_KEY);
     req.onsuccess = () => resolve((req.result as KnowledgeGraph) ?? null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function storeKnowledgeChunks(pageUrl: string, chunks: readonly KnowledgeChunk[]): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(CHUNK_STORE, "readwrite");
+    const store = tx.objectStore(CHUNK_STORE);
+    const index = store.index("pageUrl");
+    const cursorReq = index.openCursor(IDBKeyRange.only(pageUrl));
+
+    cursorReq.onsuccess = () => {
+      const cursor = cursorReq.result;
+      if (cursor) {
+        cursor.delete();
+        cursor.continue();
+        return;
+      }
+      chunks.forEach((chunk) => {
+        store.put(chunk);
+      });
+    };
+    cursorReq.onerror = () => reject(cursorReq.error);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function getAllKnowledgeChunks(): Promise<KnowledgeChunk[]> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(CHUNK_STORE, "readonly");
+    const req = tx.objectStore(CHUNK_STORE).getAll();
+    req.onsuccess = () => resolve(req.result as KnowledgeChunk[]);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function getKnowledgeChunksByPageUrl(pageUrl: string): Promise<KnowledgeChunk[]> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(CHUNK_STORE, "readonly");
+    const req = tx.objectStore(CHUNK_STORE).index("pageUrl").getAll(IDBKeyRange.only(pageUrl));
+    req.onsuccess = () => resolve(req.result as KnowledgeChunk[]);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function storeChunkEmbeddings(pageUrl: string, embeddings: readonly ChunkEmbedding[]): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(EMBEDDING_STORE, "readwrite");
+    const store = tx.objectStore(EMBEDDING_STORE);
+    const index = store.index("pageUrl");
+    const cursorReq = index.openCursor(IDBKeyRange.only(pageUrl));
+
+    cursorReq.onsuccess = () => {
+      const cursor = cursorReq.result;
+      if (cursor) {
+        cursor.delete();
+        cursor.continue();
+        return;
+      }
+      embeddings.forEach((embedding) => {
+        store.put(embedding);
+      });
+    };
+    cursorReq.onerror = () => reject(cursorReq.error);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function getAllChunkEmbeddings(): Promise<ChunkEmbedding[]> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(EMBEDDING_STORE, "readonly");
+    const req = tx.objectStore(EMBEDDING_STORE).getAll();
+    req.onsuccess = () => resolve(req.result as ChunkEmbedding[]);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function clearAllChunkEmbeddings(): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(EMBEDDING_STORE, "readwrite");
+    const req = tx.objectStore(EMBEDDING_STORE).clear();
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function clearAllKnowledgeChunks(): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(CHUNK_STORE, "readwrite");
+    const req = tx.objectStore(CHUNK_STORE).clear();
+    req.onsuccess = () => resolve();
     req.onerror = () => reject(req.error);
   });
 }
