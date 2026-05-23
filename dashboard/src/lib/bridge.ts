@@ -3,6 +3,8 @@ import type { BridgeEvent, BridgeRequest, BridgeResponse } from "@shame-the-web/
 
 const DEFAULT_REQUEST_TIMEOUT_MS = 1500;
 const SLOW_REQUEST_TIMEOUT_MS = 20000;
+const CHAT_REQUEST_TIMEOUT_MS = 120000;
+const LOG_PREFIX = "[STW][dashboard bridge]";
 
 const SLOW_REQUEST_TYPES: ReadonlySet<BridgeRequest["type"]> = new Set([
   "getAiSetupStatus",
@@ -24,9 +26,21 @@ export async function requestBridge<T extends BridgeRequest["type"]>(
   } as BridgeRequest;
 
   return new Promise((resolve, reject) => {
-    const timeoutMs = SLOW_REQUEST_TYPES.has(type) ? SLOW_REQUEST_TIMEOUT_MS : DEFAULT_REQUEST_TIMEOUT_MS;
+    const startedAt = performance.now();
+    const timeoutMs =
+      type === "chatKnowledge"
+        ? CHAT_REQUEST_TIMEOUT_MS
+        : SLOW_REQUEST_TYPES.has(type)
+          ? SLOW_REQUEST_TIMEOUT_MS
+          : DEFAULT_REQUEST_TIMEOUT_MS;
+    logBridge("request:start", { type, timeoutMs });
     const timeout = window.setTimeout(() => {
       window.removeEventListener("message", handleMessage);
+      warnBridge("request:timeout", {
+        type,
+        timeoutMs,
+        durationMs: Math.round(performance.now() - startedAt)
+      });
       reject(new Error("Extension bridge did not respond. Is the extension loaded?"));
     }, timeoutMs);
 
@@ -39,16 +53,51 @@ export async function requestBridge<T extends BridgeRequest["type"]>(
       window.removeEventListener("message", handleMessage);
 
       if (!event.data.ok) {
+        warnBridge("request:error", {
+          type,
+          durationMs: Math.round(performance.now() - startedAt),
+          error: event.data.error
+        });
         reject(new Error(event.data.error));
         return;
       }
 
+      logBridge("request:done", {
+        type,
+        durationMs: Math.round(performance.now() - startedAt)
+      });
       resolve(event.data as Extract<BridgeResponse, { ok: true; type: T }>);
     }
 
     window.addEventListener("message", handleMessage);
     window.postMessage(request, window.location.origin);
   });
+}
+
+function logBridge(message: string, details?: unknown): void {
+  if (!isBridgeDebugEnabled()) {
+    return;
+  }
+  if (details === undefined) {
+    console.info(LOG_PREFIX, message);
+    return;
+  }
+  console.info(LOG_PREFIX, message, details);
+}
+
+function warnBridge(message: string, details?: unknown): void {
+  if (!isBridgeDebugEnabled()) {
+    return;
+  }
+  if (details === undefined) {
+    console.warn(LOG_PREFIX, message);
+    return;
+  }
+  console.warn(LOG_PREFIX, message, details);
+}
+
+function isBridgeDebugEnabled(): boolean {
+  return window.localStorage.getItem("stwDebugLogs") === "1" || window.location.search.includes("stwDebug=1");
 }
 
 export async function pingBridge(): Promise<string> {
