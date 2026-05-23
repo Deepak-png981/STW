@@ -1,5 +1,7 @@
 # Export/Import End-to-End Checklist
 
+See also: [Documentation index](./README.md) · [Local AI and search](./local-ai-and-search.md) (re-embed after import)
+
 ## Preconditions
 
 - Extension installed and enabled in both source and target browser profiles.
