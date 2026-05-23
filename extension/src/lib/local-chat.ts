@@ -1,17 +1,18 @@
 import type { ChatMessage, ChatSource, ChatTurnResponse, SemanticSearchResult } from "@shame-the-web/shared";
 
+import {
+  logChatDebug,
+  summarizeModelMessages,
+  summarizeSearchResults,
+  summarizeSources
+} from "./chat-debug";
+import { selectChatGroundingResults, shouldAttachBrowsingContext } from "./chat-grounding";
+import { LOCAL_CHAT_SYSTEM_PROMPT } from "./chat-reply-quality";
+
 const WEBLLM_MODEL_ID = "Qwen2.5-0.5B-Instruct-q4f16_1-MLC";
 const LOG_PREFIX = "[STW][local chat]";
-const MAX_HISTORY_MESSAGES = 12;
-
-const SYSTEM_PROMPT = [
-  "You are a private local assistant for the user's browsing history.",
-  "Answer using this priority:",
-  "1) Facts explicitly stated earlier in this conversation.",
-  "2) Relevant snippets from the user's local browsing graph when provided.",
-  "3) If neither source is enough, say so clearly.",
-  "Use complete sentences. Keep answers as detailed as you can please."
-].join(" ");
+const MAX_HISTORY_MESSAGES = 6;
+const MAX_COMPLETION_TOKENS = 256;
 
 type ChatEngine = {
   chat: {
@@ -19,6 +20,8 @@ type ChatEngine = {
       create: (request: {
         messages: readonly { role: "system" | "user" | "assistant"; content: string }[];
         temperature: number;
+        max_tokens?: number;
+        stream?: false;
       }) => Promise<{
         choices?: readonly {
           message?: {
@@ -60,21 +63,43 @@ export async function answerFromResults(input: {
   history: readonly ChatMessage[];
   results: readonly SemanticSearchResult[];
 }): Promise<ChatTurnResponse> {
-  const sources = buildSources(input.results);
+  const groundedResults = selectChatGroundingResults(input.results);
+  const retrievedSources = buildSources(groundedResults);
+  const attachContext = shouldAttachBrowsingContext(input.query, input.results);
+  const sources = attachContext ? retrievedSources : [];
   const turn: LocalChatTurn = {
     query: input.query,
     history: input.history,
     sources
   };
 
-  const engine = await getEngine();
-  if (!engine) {
-    logChat("answer:fallback-no-engine", { sourceCount: sources.length });
+  logChatDebug("offscreen:retrieval", {
+    ...describeTurn(input),
+    groundedResultCount: groundedResults.length,
+    attachContext,
+    retrieval: summarizeSearchResults(input.results),
+    groundedResults: summarizeSearchResults(groundedResults),
+    retrievedSources: summarizeSources(retrievedSources),
+    attachedSources: summarizeSources(sources)
+  });
+
+  if (sources.length > 0 && isHistoryLookupQuery(input.query)) {
+    const text = buildHistoryLookupAnswer(input.query, sources);
+    logChatDebug("offscreen:history-lookup-response", {
+      query: input.query,
+      sourceCount: sources.length,
+      replyPreview: previewReply(text)
+    });
     return {
-      model: "fallback-template",
-      text: buildFallbackAnswer(turn),
+      model: "grounded-retrieval",
+      text,
       sources
     };
+  }
+
+  const engine = await getEngine();
+  if (!engine) {
+    throw new Error("Local chat model is unavailable.");
   }
 
   try {
@@ -85,29 +110,40 @@ export async function answerFromResults(input: {
     });
     const startedAt = performance.now();
     const messages = buildModelMessages(turn);
+    logChatDebug("offscreen:prompt", {
+      query: input.query,
+      messageCount: messages.length,
+      messages: summarizeModelMessages(messages)
+    });
     const response = await engine.chat.completions.create({
       messages,
-      temperature: 0.2
+      temperature: 0.7,
+      max_tokens: MAX_COMPLETION_TOKENS,
+      stream: false
     });
     const text = response.choices?.[0]?.message?.content?.trim();
-    const useFallback = !text || text.length === 0 || isLowQualityReply(text);
+    if (!text) {
+      throw new Error("Local model returned an empty response.");
+    }
+    logChatDebug("offscreen:completion", {
+      query: input.query,
+      hasText: !!text,
+      replyPreview: text ? previewReply(text) : null,
+      durationMs: Math.round(performance.now() - startedAt)
+    });
     logChat("answer:model-done", {
       hasText: !!text,
-      useFallback,
+      groundedSourceCount: sources.length,
       durationMs: Math.round(performance.now() - startedAt)
     });
     return {
       model: WEBLLM_MODEL_ID,
-      text: useFallback ? buildFallbackAnswer(turn) : text,
+      text,
       sources
     };
   } catch (error) {
-    warnChat("answer:model-failed; using fallback", error);
-    return {
-      model: "fallback-template",
-      text: buildFallbackAnswer(turn),
-      sources
-    };
+    warnChat("answer:model-failed", error);
+    throw error;
   }
 }
 
@@ -121,7 +157,11 @@ function buildModelMessages(
       ? `${turn.query}\n\nRelevant pages from your local browsing graph:\n${browsingContext}`
       : turn.query;
 
-  return [{ role: "system", content: SYSTEM_PROMPT }, ...history, { role: "user", content: currentUserMessage }];
+  return [
+    { role: "system", content: LOCAL_CHAT_SYSTEM_PROMPT },
+    ...history,
+    { role: "user", content: currentUserMessage }
+  ];
 }
 
 function normalizeHistory(history: readonly ChatMessage[]): readonly ChatMessage[] {
@@ -148,24 +188,30 @@ function buildSources(results: readonly SemanticSearchResult[]): readonly ChatSo
   }));
 }
 
-function buildFallbackAnswer(turn: LocalChatTurn): string {
-  const top = turn.sources[0];
-  if (!top || !normalizeSnippet(top.snippet)) {
-    return [
-      `I could not produce a confident answer for "${turn.query}" from this conversation or your browsing graph.`,
-      turn.history.length > 0
-        ? "Try asking a follow-up with more detail from earlier in this chat."
-        : "Try searching with a keyword or browse the page again so it gets indexed."
-    ].join(" ");
+function isHistoryLookupQuery(query: string): boolean {
+  const normalized = query.toLowerCase();
+  const asksForPlace = /\b(where|which|what)\b/.test(normalized);
+  const asksForSource = /\b(read|saw|visit|visited|page|link|url|source|find|look up|lookup)\b/.test(normalized);
+  return asksForPlace && asksForSource;
+}
+
+function buildHistoryLookupAnswer(query: string, sources: readonly ChatSource[]): string {
+  const top = sources[0];
+  if (!top) {
+    return `I couldn't find a matching page in your local history for "${query}".`;
   }
 
-  const snippet = normalizeSnippet(top.snippet);
-  const related = turn.sources.slice(1, 3).map((source) => source.title).join(", ");
+  const related = sources
+    .slice(1, 3)
+    .map((source) => `${source.title} (${source.url})`)
+    .join("; ");
+  const snippet = top.snippet.trim();
+
   return [
-    `Based on your local browsing history, the strongest match for "${turn.query}" is "${top.title}".`,
-    snippet ? `What I found on that page: ${snippet}` : "",
-    related ? `Related pages: ${related}.` : "",
-    "Ask a follow-up and I can narrow this down further."
+    `You likely read that on "${top.title}".`,
+    `URL: ${top.url}`,
+    snippet ? `Snippet: ${snippet}` : "",
+    related ? `Related pages: ${related}.` : ""
   ]
     .filter(Boolean)
     .join(" ");
@@ -233,17 +279,24 @@ function isChatEngine(value: unknown): value is ChatEngine {
   return typeof (completions as Record<string, unknown>)["create"] === "function";
 }
 
-function normalizeSnippet(value: string): string {
-  return value.replace(/\s+/g, " ").trim();
+function describeTurn(input: {
+  query: string;
+  history: readonly ChatMessage[];
+  results: readonly SemanticSearchResult[];
+}): Record<string, unknown> {
+  return {
+    query: input.query,
+    historyLength: input.history.length,
+    rawResultCount: input.results.length
+  };
 }
 
-function isLowQualityReply(value: string): boolean {
-  const normalized = value.trim();
-  if (normalized.length < 18) {
-    return true;
+function previewReply(value: string): string {
+  const normalized = value.replace(/\s+/g, " ").trim();
+  if (normalized.length <= 240) {
+    return normalized;
   }
-  const wordCount = normalized.split(/\s+/).filter(Boolean).length;
-  return wordCount < 4;
+  return `${normalized.slice(0, 240).trim()}…`;
 }
 
 function logChat(message: string, details?: unknown): void {
