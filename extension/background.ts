@@ -52,8 +52,10 @@ type RuntimeMessage = BridgeRequest | RecordVisitMessage | StorePageContentMessa
 
 let rebuildTimer: ReturnType<typeof setTimeout> | null = null;
 let aiSetupTimer: ReturnType<typeof setTimeout> | null = null;
+const AI_LOG_PREFIX = "[STW][background AI]";
 
 function scheduleAiSetup(delayMs = 1000): void {
+  console.info(AI_LOG_PREFIX, "scheduleAiSetup", { delayMs, alreadyScheduled: aiSetupTimer !== null });
   if (aiSetupTimer !== null) {
     clearTimeout(aiSetupTimer);
   }
@@ -195,6 +197,8 @@ async function handleRuntimeMessage(
   }
 
   if (message.type === "semanticSearchKnowledge") {
+    console.info(AI_LOG_PREFIX, "semanticSearchKnowledge:start", { queryLength: message.query.length });
+    const startedAt = performance.now();
     const [pages, graph] = await Promise.all([getAllPageContents(), getStoredKnowledgeGraph()]);
     await ensureSearchReady(pages, (status) => {
       void broadcastAiSetupProgress(status);
@@ -203,6 +207,11 @@ async function handleRuntimeMessage(
       query: message.query,
       pages,
       graph
+    });
+    console.info(AI_LOG_PREFIX, "semanticSearchKnowledge:done", {
+      pageCount: pages.length,
+      resultCount: results.length,
+      durationMs: Math.round(performance.now() - startedAt)
     });
     return {
       id: message.id,
@@ -214,6 +223,11 @@ async function handleRuntimeMessage(
   }
 
   if (message.type === "chatKnowledge") {
+    console.info(AI_LOG_PREFIX, "chatKnowledge:start", {
+      queryLength: message.query.length,
+      historyLength: message.history.length
+    });
+    const startedAt = performance.now();
     const [pages, graph] = await Promise.all([getAllPageContents(), getStoredKnowledgeGraph()]);
     await ensureSearchReady(pages, (status) => {
       void broadcastAiSetupProgress(status);
@@ -230,6 +244,13 @@ async function handleRuntimeMessage(
       query: message.query,
       history: message.history,
       results
+    });
+    console.info(AI_LOG_PREFIX, "chatKnowledge:done", {
+      pageCount: pages.length,
+      resultCount: results.length,
+      model: answer.model,
+      sourceCount: answer.sources.length,
+      durationMs: Math.round(performance.now() - startedAt)
     });
     return {
       id: message.id,
@@ -367,12 +388,15 @@ async function broadcastAiSetupProgress(status: AiSetupStatus): Promise<void> {
 }
 
 async function runAiSetupInBackground(): Promise<void> {
+  const startedAt = performance.now();
+  console.info(AI_LOG_PREFIX, "background setup:start");
   const hasOffscreen = await ensureOffscreenDocument();
   if (!hasOffscreen) {
     console.warn("[STW] background: offscreen document unavailable; falling back to service worker runtime");
   }
 
   const pages = await getAllPageContents();
+  console.info(AI_LOG_PREFIX, "background setup:pages", { pageCount: pages.length, hasOffscreen });
   await ensureSearchReady(pages, (status) => {
     void broadcastAiSetupProgress(status);
   });
@@ -383,6 +407,10 @@ async function runAiSetupInBackground(): Promise<void> {
       void broadcastAiSetupProgress(status);
     });
   }
+  console.info(AI_LOG_PREFIX, "background setup:done", {
+    finalPhase: getCurrentAiSetupStatus().phase,
+    durationMs: Math.round(performance.now() - startedAt)
+  });
 }
 
 function matchesDashboardOrigin(url: string | undefined): boolean {
