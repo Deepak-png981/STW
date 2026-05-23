@@ -1,4 +1,4 @@
-const OFFSCREEN_DOCUMENT_PATH = "offscreen.html";
+const OFFSCREEN_DOCUMENT_PATH = "assets/offscreen.html";
 const OFFSCREEN_REASON: chrome.offscreen.Reason[] = ["WORKERS"];
 
 export async function ensureOffscreenDocument(): Promise<boolean> {
@@ -13,9 +13,9 @@ export async function ensureOffscreenDocument(): Promise<boolean> {
     }
 
     await chrome.offscreen.createDocument({
-      url: OFFSCREEN_DOCUMENT_PATH,
+      url: chrome.runtime.getURL(OFFSCREEN_DOCUMENT_PATH),
       reasons: OFFSCREEN_REASON,
-      justification: "Run local embedding and chat runtimes without blocking the service worker."
+      justification: "Run local embedding models without blocking the service worker."
     });
     return true;
   } catch {
@@ -30,5 +30,7 @@ async function hasOffscreenDocument(): Promise<boolean> {
 
   const extensionOrigin = chrome.runtime.getURL("/");
   const matchedClients = await clients.matchAll();
-  return matchedClients.some((client) => client.url.startsWith(extensionOrigin) && client.url.endsWith(OFFSCREEN_DOCUMENT_PATH));
+  return matchedClients.some(
+    (client) => client.url.startsWith(extensionOrigin) && client.url.includes("offscreen")
+  );
 }
