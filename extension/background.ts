@@ -26,6 +26,8 @@ import {
   getAiSetupStatus as getCurrentAiSetupStatus,
   runSemanticSearch
 } from "./src/lib/ai-setup";
+import { logChatDebug, summarizeSearchResults } from "./src/lib/chat-debug";
+import { describeGroundingDecision, selectChatGroundingResults } from "./src/lib/chat-grounding";
 import { ensureOffscreenDocument } from "./src/lib/offscreen-runtime";
 import {
   buildKnowledgeExport,
@@ -232,10 +234,17 @@ async function handleRuntimeMessage(
     await ensureSearchReady(pages, (status) => {
       void broadcastAiSetupProgress(status);
     });
-    const results = await runSemanticSearch({
+    const rawResults = await runSemanticSearch({
       query: message.query,
       pages,
       graph
+    });
+    logChatDebug("background:chat-retrieval", {
+      chatQuery: message.query,
+      historyLength: message.history.length,
+      decision: describeGroundingDecision(message.query, rawResults),
+      rawResults: summarizeSearchResults(rawResults),
+      groundedResults: summarizeSearchResults(selectChatGroundingResults(rawResults))
     });
     await ensureConversationReady((status) => {
       void broadcastAiSetupProgress(status);
@@ -243,11 +252,11 @@ async function handleRuntimeMessage(
     const answer = await answerFromLocalKnowledge({
       query: message.query,
       history: message.history,
-      results
+      results: rawResults
     });
     console.info(AI_LOG_PREFIX, "chatKnowledge:done", {
       pageCount: pages.length,
-      resultCount: results.length,
+      rawResultCount: rawResults.length,
       model: answer.model,
       sourceCount: answer.sources.length,
       durationMs: Math.round(performance.now() - startedAt)
