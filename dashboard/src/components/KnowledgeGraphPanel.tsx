@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Graph from "graphology";
 import { Sigma } from "sigma";
 import forceAtlas2 from "graphology-layout-forceatlas2";
-import type { AiSetupStatus, ChatMessage, SemanticReason, SemanticSearchResult } from "@shame-the-web/shared";
+import type { AiSetupStatus, ChatMessage, ChatSource, SemanticReason, SemanticSearchResult } from "@shame-the-web/shared";
 import { DEFAULT_AI_SETUP_STATUS } from "@shame-the-web/shared";
 import type { KnowledgeGraph, KnowledgeNode } from "@shame-the-web/shared";
 
@@ -66,6 +66,7 @@ export function KnowledgeGraphPanel() {
   const [chatInput, setChatInput] = useState("");
   const [openFlyout, setOpenFlyout] = useState<null | "search" | "chat">(null);
   const [isChatHistoryOpen, setIsChatHistoryOpen] = useState(false);
+  const [lastChatSources, setLastChatSources] = useState<readonly ChatSource[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const chatInputRef = useRef<HTMLInputElement>(null);
   const chatHistoryMenuRef = useRef<HTMLDivElement>(null);
@@ -361,27 +362,18 @@ export function KnowledgeGraphPanel() {
     );
     setChatInput("");
 
-    if (isGreeting(message)) {
-      const greetingReply: ChatMessage = {
-        role: "assistant",
-        content:
-          "Hi! I can answer questions about pages in your local browsing graph and I also keep context inside this chat."
-      };
-      setChatThreads((current) =>
-        updateThreadById(current, chatId, (thread) =>
-          thread.pendingRequestId === requestId
-            ? withThreadMessages(thread, [...thread.messages, greetingReply], null)
-            : thread
-        )
-      );
-      return;
-    }
-
     try {
       const response = await requestBridge("chatKnowledge", {
         query: message,
         sessionId: "local-default",
         history: priorHistory
+      });
+      setLastChatSources(response.data.sources);
+      console.warn("[STW][chat-debug]", {
+        chatQuery: message,
+        model: response.data.model,
+        sourceCount: response.data.sources.length,
+        sources: response.data.sources
       });
       const assistantReply: ChatMessage = { role: "assistant", content: response.data.text };
       setChatThreads((current) =>
@@ -713,13 +705,14 @@ export function KnowledgeGraphPanel() {
                     </div>
                   </div>
                 ) : null}
-                {results.length > 0 ? (
+                {lastChatSources.length > 0 ? (
                   <p className="knowledge-context-note">
-                    Using {results.length} current search result{results.length === 1 ? "" : "s"} as context.
+                    Chat retrieved {lastChatSources.length} indexed chunk
+                    {lastChatSources.length === 1 ? "" : "s"} from your graph (search panel is separate).
                   </p>
                 ) : (
                   <p className="knowledge-context-note">
-                    Tip: search improves grounding. This chat also remembers context inside each thread.
+                    Chat searches your indexed pages automatically — you do not need to use Search first.
                   </p>
                 )}
                 <div className="knowledge-chat-thread" aria-live="polite">
@@ -838,10 +831,6 @@ function reasonLabel(reason: SemanticReason): string {
       return exhaustiveCheck;
     }
   }
-}
-
-function isGreeting(value: string): boolean {
-  return /^(hi|hello|hey|yo|sup|namaste|hola)[!. ]*$/i.test(value.trim());
 }
 
 type StatusTone = "idle" | "working" | "ready" | "warning" | "error";
