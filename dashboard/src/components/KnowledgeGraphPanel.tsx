@@ -9,6 +9,7 @@ import type { KnowledgeGraph, KnowledgeNode } from "@shame-the-web/shared";
 import { requestBridge, subscribeBridgeEvents } from "../lib/bridge";
 import { KnowledgeChatRail } from "./knowledge/knowledge-chat-rail";
 import { useChatRailWidth } from "./knowledge/use-chat-rail-width";
+import { usePersistedChatThreads } from "./knowledge/use-persisted-chat-threads";
 import {
   clearThreadMessages,
   createEmptyChatThread,
@@ -16,7 +17,6 @@ import {
   updateThreadById,
   withThreadMessages
 } from "./knowledge-chat-threads";
-import type { ChatThread } from "./knowledge-chat-threads";
 
 /** Saturated neon palette (GitNexus-inspired: purple, cyan, lime, coral, amber…) */
 const CLUSTER_COLORS = [
@@ -60,11 +60,7 @@ export function KnowledgeGraphPanel() {
   const [hasSearched, setHasSearched] = useState(false);
   const [showNodeLabels, setShowNodeLabels] = useState(true);
   const [aiStatus, setAiStatus] = useState<AiSetupStatus>(DEFAULT_AI_SETUP_STATUS);
-  const [chatThreads, setChatThreads] = useState<ChatThread[]>(() => {
-    const initialThread = createEmptyChatThread();
-    return [initialThread];
-  });
-  const [activeChatId, setActiveChatId] = useState("");
+  const { chatThreads, setChatThreads, activeChatId, setActiveChatId } = usePersistedChatThreads();
   const [chatInput, setChatInput] = useState("");
   const [openFlyout, setOpenFlyout] = useState<null | "search">(null);
   const [isChatOpen, setIsChatOpen] = useState(true);
