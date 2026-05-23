@@ -1,8 +1,8 @@
 {
   "name": "@shame-the-web/extension",
   "displayName": "Shame The Web",
-  "description": "Playfully benchmarks websites and serves tiny speed roasts.",
-  "version": "0.1.0",
+  "description": "Scores pages, roasts slow sites, and builds a private on-device knowledge graph you can search and chat with.",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "icon": "assets/logo.png",
