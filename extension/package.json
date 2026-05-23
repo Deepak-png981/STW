@@ -7,10 +7,19 @@
   "type": "module",
   "icon": "assets/logo.png",
   "scripts": {
+    "predev": "node scripts/sync-ort-assets.mjs",
+    "prebuild": "node scripts/sync-ort-assets.mjs",
+    "postbuild": "node scripts/build-offscreen.mjs",
+    "build:offscreen": "node scripts/build-offscreen.mjs",
     "dev": "plasmo dev",
     "build": "plasmo build",
     "package": "plasmo package",
     "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "alias": {
+    "@huggingface/transformers": "../node_modules/@huggingface/transformers/dist/transformers.web.js",
+    "sharp": "./src/lib/stubs/node-only.ts",
+    "onnxruntime-node": "./src/lib/stubs/node-only.ts"
   },
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
@@ -33,12 +42,21 @@
       "http://*/*",
       "https://*/*"
     ],
+    "content_security_policy": {
+      "extension_pages": "script-src 'self' 'wasm-unsafe-eval' http://localhost; object-src 'self'"
+    },
     "externally_connectable": {
       "matches": [
         "http://localhost:5173/*",
         "https://shametheweb.com/*",
         "https://www.shametheweb.com/*"
       ]
-    }
+    },
+    "web_accessible_resources": [
+      {
+        "resources": ["assets/ort/*", "assets/offscreen.js", "assets/offscreen.html"],
+        "matches": ["<all_urls>"]
+      }
+    ]
   }
 }
