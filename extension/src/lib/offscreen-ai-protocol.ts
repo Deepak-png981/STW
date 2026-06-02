@@ -11,10 +11,17 @@ export type OffscreenAiRequest =
       query: string;
       history: readonly ChatMessage[];
       results: readonly SemanticSearchResult[];
-    };
+    }
+  | { kind: "rerank"; query: string; snippets: readonly string[] };
 
 export type OffscreenAiResponse =
-  | { ok: true; vectors?: readonly (readonly number[])[]; answer?: ChatTurnResponse; ready?: boolean }
+  | {
+      ok: true;
+      vectors?: readonly (readonly number[])[];
+      answer?: ChatTurnResponse;
+      ready?: boolean;
+      scores?: readonly number[];
+    }
   | { ok: false; error: string };
 
 export type OffscreenAiEnvelope = {

@@ -67,6 +67,17 @@ export async function primeChatViaOffscreen(): Promise<boolean> {
   return response.ok && response.ready === true;
 }
 
+export async function rerankPairsViaOffscreen(
+  query: string,
+  snippets: readonly string[]
+): Promise<readonly number[]> {
+  const response = await requestOffscreenAi({ kind: "rerank", query, snippets });
+  if (!response.ok || !response.scores) {
+    throw new Error(response.ok ? "Offscreen AI returned no rerank scores." : response.error);
+  }
+  return response.scores;
+}
+
 export async function answerViaOffscreenChat(input: {
   query: string;
   history: readonly ChatMessage[];
@@ -96,6 +107,8 @@ function summarizeRequest(request: OffscreenAiRequest): Record<string, unknown> 
         historyLength: request.history.length,
         resultCount: request.results.length
       };
+    case "rerank":
+      return { kind: request.kind, queryLength: request.query.length, snippetCount: request.snippets.length };
     default: {
       const exhaustiveCheck: never = request;
       return { kind: String(exhaustiveCheck) };

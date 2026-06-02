@@ -6,6 +6,7 @@ import {
   type OffscreenAiResponse
 } from "./src/lib/offscreen-ai-protocol";
 import { answerFromResults, primeLocalChatModel } from "./src/lib/local-chat";
+import { rerankPairsInOffscreen } from "./src/lib/rerank-runtime";
 import { embedTextsInOffscreen, resetTransformersRuntime, warmupTransformersRuntime } from "./src/lib/transformers-runtime";
 
 const LOG_PREFIX = "[STW][offscreen]";
@@ -70,6 +71,10 @@ async function handleOffscreenAi(request: OffscreenAiRequest): Promise<Offscreen
       });
       return { ok: true, answer };
     }
+    case "rerank": {
+      const scores = await rerankPairsInOffscreen(request.query, request.snippets);
+      return { ok: true, scores };
+    }
     default: {
       const exhaustiveCheck: never = request;
       return { ok: false, error: `Unknown offscreen AI request: ${String(exhaustiveCheck)}` };
@@ -92,6 +97,8 @@ function summarizeRequest(request: OffscreenAiRequest): Record<string, unknown> 
         historyLength: request.history.length,
         resultCount: request.results.length
       };
+    case "rerank":
+      return { kind: request.kind, queryLength: request.query.length, snippetCount: request.snippets.length };
     default: {
       const exhaustiveCheck: never = request;
       return { kind: String(exhaustiveCheck) };
