@@ -68,6 +68,12 @@ export function PrivacyPage() {
         <li>You can clear all stored data from the extension settings at any time.</li>
         <li>If you export data, you will be prompted to choose the exported file location on your own device.</li>
         <li>
+          <strong>Encrypted packs</strong> — you can optionally protect an export with a passphrase. The pack is encrypted
+          entirely on your device using WebCrypto (PBKDF2 key derivation + AES-256-GCM) before it ever touches disk. The
+          passphrase is never stored, logged, or transmitted, so a lost passphrase makes the pack permanently
+          unrecoverable.
+        </li>
+        <li>
           Imported graph files are processed locally in the extension; model binaries are not included in export files and
           are re-downloaded locally if needed.
         </li>

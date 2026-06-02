@@ -3209,3 +3209,37 @@ body.knowledge-chat-rail-resizing * {
 .dashboard-settings-import-file input[type="file"] {
   display: none;
 }
+
+.dashboard-settings-encrypt {
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+}
+
+.dashboard-settings-encrypt legend {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.dashboard-settings-encrypt label {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.dashboard-settings-passphrase {
+  border: 1px solid var(--color-border, #d0d0d8);
+  border-radius: 0.5rem;
+  font: inherit;
+  max-width: 22rem;
+  padding: 0.5rem 0.75rem;
+}
+
+.dashboard-settings-warning {
+  margin: 0;
+  max-width: 32rem;
+}
