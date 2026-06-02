@@ -737,6 +737,8 @@ function reasonLabel(reason: SemanticReason): string {
       return "Recently visited";
     case "visited":
       return "Frequent page";
+    case "reranked":
+      return "Re-ranked match";
     default: {
       const exhaustiveCheck: never = reason;
       return exhaustiveCheck;
