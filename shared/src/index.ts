@@ -66,7 +66,7 @@ export type ChunkEmbedding = {
   createdAt: string;
 };
 
-export type SemanticReason = "semantic" | "keyword" | "graph" | "recent" | "visited";
+export type SemanticReason = "semantic" | "keyword" | "graph" | "recent" | "visited" | "reranked";
 
 export type SemanticSearchResult = KnowledgeSearchResult & {
   reasons: readonly SemanticReason[];
