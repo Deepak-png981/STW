@@ -94,16 +94,38 @@ export type ChatTurnResponse = {
   model: string;
 };
 
-export type KnowledgeExportFormatVersion = 1;
+export type KnowledgeExportFormatVersion = 1 | 2;
 export type KnowledgeImportMode = "merge" | "replace";
 
 export type KnowledgeGraphExportV1 = {
-  formatVersion: KnowledgeExportFormatVersion;
+  formatVersion: 1;
   app: "shame-the-web";
   exportedAt: string;
   pages: readonly PageContent[];
   graph: KnowledgeGraph;
   visits: readonly VisitRecord[];
+};
+
+/** PBKDF2 key-derivation parameters carried inside an encrypted pack. */
+export type KnowledgePackKdfParams = {
+  name: "PBKDF2";
+  hash: "SHA-256";
+  iterations: number;
+};
+
+/**
+ * Format v2: a passphrase-encrypted wrapper around a {@link KnowledgeGraphExportV1}.
+ * All binary fields are base64-encoded so the envelope is plain JSON. The AES-GCM
+ * authentication tag is appended to `ciphertext`, so tampering is detected on decrypt.
+ */
+export type EncryptedKnowledgePack = {
+  formatVersion: 2;
+  app: "shame-the-web";
+  kdf: KnowledgePackKdfParams;
+  cipher: "AES-GCM";
+  salt: string;
+  iv: string;
+  ciphertext: string;
 };
 
 export type AiSetupPhase =
@@ -206,13 +228,21 @@ export type BridgeRequest =
   | { id: string; source: typeof SHAME_THE_WEB_BRIDGE_SOURCE; type: "searchKnowledge"; query: string }
   | { id: string; source: typeof SHAME_THE_WEB_BRIDGE_SOURCE; type: "getAiSetupStatus" }
   | { id: string; source: typeof SHAME_THE_WEB_BRIDGE_SOURCE; type: "semanticSearchKnowledge"; query: string }
-  | { id: string; source: typeof SHAME_THE_WEB_BRIDGE_SOURCE; type: "exportKnowledgeGraph" }
+  | {
+      id: string;
+      source: typeof SHAME_THE_WEB_BRIDGE_SOURCE;
+      type: "exportKnowledgeGraph";
+      /** When provided, the pack is encrypted client-side before download. */
+      passphrase?: string;
+    }
   | {
       id: string;
       source: typeof SHAME_THE_WEB_BRIDGE_SOURCE;
       type: "importKnowledgeGraph";
       fileContents: string;
       mode: KnowledgeImportMode;
+      /** Required only when the imported pack is an encrypted v2 envelope. */
+      passphrase?: string;
     }
   | {
       id: string;
@@ -326,6 +356,7 @@ export type BridgeResponse =
         json: string;
         pageCount: number;
         edgeCount: number;
+        encrypted: boolean;
       };
     }
   | {
