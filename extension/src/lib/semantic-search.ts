@@ -6,7 +6,7 @@ import type {
   SemanticReason,
   SemanticSearchResult
 } from "@shame-the-web/shared";
-import { searchPages } from "./tfidf";
+import { buildIndex, searchIndex } from "./minisearch-index";
 import { embedText } from "./local-embeddings";
 
 const MAX_RESULTS = 10;
@@ -45,7 +45,7 @@ export async function semanticSearchPages(input: {
     }
   }
 
-  const keywordResults = searchPages(query, [...input.pages]);
+  const keywordResults = searchIndex(buildIndex(input.pages), query);
   const keywordScoreByUrl = new Map(keywordResults.map((result) => [result.url, result.score]));
   const graphBoostByUrl = buildGraphBoost(input.graph, new Set(bestChunkByPage.keys()));
   const visitCountByUrl = new Map(input.graph?.nodes.map((node) => [node.url, node.visitCount]) ?? []);
