@@ -7,7 +7,11 @@
  *     including SPAs that swap content via history.pushState (X, YouTube, Reddit,
  *     Mastodon, news sites with virtual scrolling, etc).
  *   - No per-host special-casing.
+ *   - Prefer Mozilla Readability (clean article extraction) when the page looks
+ *     like an article; otherwise fall back to the generic heuristics below.
  */
+
+import { extractReadableArticle, type ReadableArticle } from "./readability-extract";
 
 const NOISY_TAGS = new Set([
   "SCRIPT",
@@ -28,6 +32,10 @@ const MAX_HEADING_CHARS = 200;
 const MAX_HEADINGS = 24;
 const MAX_STRUCTURED_TEXT_CHARS = 6_000;
 
+// Below this, a Readability result is too thin to trust (SPAs, dashboards,
+// teaser pages), so we defer to the generic heuristic path instead.
+const MIN_READABLE_CHARS = 400;
+
 export type RawPageContent = {
   url: string;
   title: string;
@@ -43,21 +51,45 @@ export function extractPageContent(): RawPageContent {
   const ld = readJsonLd();
 
   const title = pickTitle(ld);
-  const description = pickDescription(ld);
   const headings = pickHeadings();
-  const mainText = pickMainText();
-  const structuredText = pickStructuredBodyText(ld);
+  const article = pickReadableArticle();
 
-  const composed = mergeBodyText([structuredText, description, mainText]).slice(0, MAX_BODY_CHARS);
+  // Readability's excerpt is a clean one-liner; use it only if the page has no
+  // explicit meta/JSON-LD description of its own.
+  const description = (pickDescription(ld) || article?.excerpt || "").slice(0, MAX_DESCRIPTION_CHARS);
+
+  const bodyText = article
+    ? composeReadableBody(article, description)
+    : composeHeuristicBody(ld, description);
 
   return {
     url,
     title,
-    description: description.slice(0, MAX_DESCRIPTION_CHARS),
+    description,
     headings: headings.slice(0, MAX_HEADINGS),
-    bodyText: composed,
+    bodyText,
     visitedAt
   };
+}
+
+/**
+ * Run Readability on the live document, returning it only when it produced
+ * enough text to be worth preferring over the heuristics. `null` => fall back.
+ */
+function pickReadableArticle(): ReadableArticle | null {
+  const article = extractReadableArticle(document);
+  if (!article || article.textContent.length < MIN_READABLE_CHARS) return null;
+  return article;
+}
+
+function composeReadableBody(article: ReadableArticle, description: string): string {
+  return mergeBodyText([description, article.textContent]).slice(0, MAX_BODY_CHARS);
+}
+
+function composeHeuristicBody(ld: JsonLdValue[], description: string): string {
+  const structuredText = pickStructuredBodyText(ld);
+  const mainText = pickMainText();
+  return mergeBodyText([structuredText, description, mainText]).slice(0, MAX_BODY_CHARS);
 }
 
 /* -------------------------------------------------------------------------- */
