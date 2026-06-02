@@ -24,6 +24,7 @@
   "dependencies": {
     "@huggingface/transformers": "^4.2.0",
     "@mlc-ai/web-llm": "^0.2.83",
+    "@mozilla/readability": "^0.6.0",
     "@shame-the-web/shared": "0.0.0",
     "plasmo": "^0.90.5",
     "react": "^19.2.5",
