@@ -21,8 +21,10 @@ import {
 import { HandWrittenTitle } from "./components/ui/hand-writing-text";
 import { NotFoundPage } from "./components/ui/404-page-not-found";
 import { DashboardSettingsPanel } from "./components/DashboardSettingsPanel";
+import { EducationPanel } from "./components/EducationPanel";
 import { KnowledgeGraphPanel } from "./components/KnowledgeGraphPanel";
 import { PrivacyPage } from "./pages/Privacy";
+import { getCategoryLabel, scoreCategories } from "./lib/score-categories";
 
 const DASHBOARD_NAV_IDS = ["dashboard", "scores", "offenders", "education", "history", "knowledge", "settings"] as const;
 type DashboardNavId = (typeof DASHBOARD_NAV_IDS)[number];
@@ -65,38 +67,6 @@ function Link({ href, className, children }: { href: string; className?: string;
     </a>
   );
 }
-
-const categories: Array<{
-  key: ScoreCategory;
-  label: string;
-  description: string;
-  hint: string;
-}> = [
-  {
-    key: "speed",
-    label: "Speed",
-    description: "Speed is about how long the page makes you wait before it feels ready.",
-    hint: "Look for heavy scripts, oversized images, and slow server responses."
-  },
-  {
-    key: "responsiveness",
-    label: "Responsiveness",
-    description: "Responsiveness is about whether taps, clicks, and scrolling feel instant or delayed.",
-    hint: "Look for long tasks, blocked input, and pages that ignore you for a second."
-  },
-  {
-    key: "stability",
-    label: "Stability",
-    description: "Stability is about whether the page settles down instead of wobbling around.",
-    hint: "Look for late-loading media, layout shifts, and content that jumps under the cursor."
-  },
-  {
-    key: "polish",
-    label: "Polish",
-    description: "Polish is the overall feeling that the page was built with care.",
-    hint: "Look for rough loading states, janky transitions, and pages that feel unfinished."
-  }
-];
 
 const metricCards = [
   {
@@ -420,12 +390,12 @@ function Dashboard({
 
   return (
     <section className="dashboard-frame" id="dashboard">
-      <div className={`dashboard-shell${isKnowledgeView ? " dashboard-shell--immersive" : ""}`}>
+      <div className="dashboard-shell dashboard-shell--immersive">
         <DashboardSidebar activeNavId={activeNavId} onSelectPanel={goToPanel} />
 
         <div
           ref={canvasRef}
-          className={`dashboard-canvas${isKnowledgeView ? " dashboard-canvas--immersive" : ""}`}
+          className={`dashboard-canvas${isKnowledgeView ? " dashboard-canvas--immersive dashboard-canvas--knowledge" : " dashboard-canvas--flat"}`}
           role="main"
         >
           {activeNavId === "dashboard" ? (
@@ -471,7 +441,7 @@ function Dashboard({
             <article className="coach-card grade-card">
               <div>
                 <p className="card-kicker">Current Shame Grade</p>
-                <strong>{hasVisits ? coachGrade.grade : "—"}</strong>
+                <strong>{hasVisits ? coachGrade.grade : "N/A"}</strong>
                 <p>{hasVisits ? getCoachCopy(stats.averageOverallScore100) : "No data yet. The coach is stretching dramatically."}</p>
               </div>
               <span className={`grade-badge grade-${coachGrade.tone}`}>{hasVisits ? coachGrade.label : "Waiting"}</span>
@@ -511,7 +481,7 @@ function Dashboard({
               </button>
             </div>
             <div className="score-list">
-              {categories.map((category) => (
+              {scoreCategories.map((category) => (
                 <ScoreRow
                   key={category.key}
                   label={category.label}
@@ -534,7 +504,7 @@ function Dashboard({
                 <div className="trend-chart" aria-label="Recent visit scores">
                   <div className="trend-chart-header">
                     <span className="trend-chart-caption">
-                      Last {recentTrend.length} visits — height is score (0–100).
+                      Last {recentTrend.length} visits. Height is score (0-100).
                     </span>
                     <div className="trend-chart-scale" aria-hidden="true">
                       <span>100</span>
@@ -625,26 +595,7 @@ function Dashboard({
           </section>
           ) : null}
 
-          {activeNavId === "education" ? (
-          <section className="section-card">
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">Learn score rules</p>
-                <h2>What your coach is actually judging.</h2>
-              </div>
-            </div>
-            <div className="education-grid">
-              {categories.map((category) => (
-                <article className="education-card" key={category.key}>
-                  <span>{category.label}</span>
-                  <p>{category.description}</p>
-                  <strong>What to look for</strong>
-                  <p>{category.hint}</p>
-                </article>
-              ))}
-            </div>
-          </section>
-          ) : null}
+          {activeNavId === "education" ? <EducationPanel onNavigate={goToPanel} /> : null}
 
           {activeNavId === "history" ? (
           <section className="section-card">
@@ -714,7 +665,7 @@ function DashboardSidebar({
           <Link className="sidebar-brand" href="/" aria-label="Shame The Web home">
             <img src="/Logof.png" alt="" className="sidebar-brand-logo" decoding="async" />
           </Link>
-          <p className="sidebar-tagline">Scores, roasts, and tiny performance consequences.</p>
+          <p className="sidebar-tagline">Scores, roasts, and a local, searchable web memory.</p>
         </div>
         <nav aria-label="Dashboard navigation">
           <button
@@ -856,17 +807,13 @@ function abbreviateHost(hostname: string): string {
 }
 
 function getCategoryByScore(categoryAverages: Record<ScoreCategory, number>, mode: "strongest" | "weakest"): ScoreCategory {
-  return categories.reduce<ScoreCategory>((selected, category) => {
+  return scoreCategories.reduce<ScoreCategory>((selected, category) => {
     if (mode === "strongest") {
       return categoryAverages[category.key] > categoryAverages[selected] ? category.key : selected;
     }
 
     return categoryAverages[category.key] < categoryAverages[selected] ? category.key : selected;
   }, "speed");
-}
-
-function getCategoryLabel(category: ScoreCategory): string {
-  return categories.find((item) => item.key === category)?.label ?? category;
 }
 
 function getScorePercent(score: number): number {
