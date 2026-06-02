@@ -1,4 +1,5 @@
 import type { KnowledgeSearchResult, PageContent } from "@shame-the-web/shared";
+import { extractSnippet } from "./snippet";
 
 const STOPWORDS = new Set([
   "a", "an", "the", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by",
@@ -135,51 +136,6 @@ export function searchPages(query: string, pages: PageContent[]): KnowledgeSearc
       snippet,
       score
     }));
-}
-
-function extractSnippet(
-  page: Pick<PageContent, "bodyText" | "description" | "title">,
-  queryTokens: string[]
-): string {
-  const sources = [page.description, page.bodyText, page.title].filter(Boolean);
-  if (sources.length === 0 || queryTokens.length === 0) {
-    const first = sources[0];
-    return first ? first.slice(0, 150) : "";
-  }
-
-  let best = "";
-  let bestScore = 0;
-
-  for (const text of sources) {
-    const s = snippetFromText(text, queryTokens);
-    const score = queryTokens.filter((tok) => s.toLowerCase().includes(tok)).length;
-    if (score > bestScore || (score === bestScore && s.length > best.length)) {
-      bestScore = score;
-      best = s;
-    }
-  }
-
-  return best;
-}
-
-function snippetFromText(bodyText: string, queryTokens: string[]): string {
-  if (!bodyText) return "";
-  const lower = bodyText.toLowerCase();
-  let bestPos = 0;
-  let bestCount = 0;
-
-  for (let i = 0; i < Math.max(0, lower.length - 150); i += 20) {
-    const slice = lower.slice(i, i + 150);
-    const count = queryTokens.filter((tok) => slice.includes(tok)).length;
-    if (count > bestCount) {
-      bestCount = count;
-      bestPos = i;
-    }
-  }
-
-  const start = bestPos;
-  const excerpt = bodyText.slice(start, start + 150);
-  return (start > 0 ? "\u2026" : "") + excerpt + (start + 150 < bodyText.length ? "\u2026" : "");
 }
 
 function safeHostname(url: string): string {
