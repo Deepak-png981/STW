@@ -52,16 +52,16 @@ const visits: VisitRecord[] = [
 ];
 
 describe("knowledge-transfer", () => {
-  it("serializes and parses export payload", () => {
-    const exported = buildKnowledgeExport({ pages, visits, graph });
-    const parsed = parseKnowledgeImport(exported.json);
+  it("serializes and parses export payload", async () => {
+    const exported = await buildKnowledgeExport({ pages, visits, graph });
+    const parsed = await parseKnowledgeImport(exported.json);
     expect(parsed.pages).toHaveLength(2);
     expect(parsed.visits).toHaveLength(1);
     expect(parsed.app).toBe("shame-the-web");
   });
 
-  it("rejects malformed import payload", () => {
-    expect(() => parseKnowledgeImport("{\"formatVersion\":2}")).toThrow();
+  it("rejects malformed import payload", async () => {
+    await expect(parseKnowledgeImport("{\"formatVersion\":2}")).rejects.toThrow();
   });
 
   it("merges pages by newest visitedAt", () => {
