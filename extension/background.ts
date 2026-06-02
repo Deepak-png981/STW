@@ -280,10 +280,11 @@ async function handleRuntimeMessage(
       ? state.visits.filter((visit) => visit.userId === state.activeUserId)
       : state.visits;
     const exportGraph = graph ?? buildKnowledgeGraph(pages, activeUserVisits);
-    const exported = buildKnowledgeExport({
+    const exported = await buildKnowledgeExport({
       pages,
       visits: activeUserVisits,
-      graph: exportGraph
+      graph: exportGraph,
+      passphrase: message.passphrase
     });
     return {
       id: message.id,
@@ -294,13 +295,14 @@ async function handleRuntimeMessage(
         filename: exported.filename,
         json: exported.json,
         pageCount: exported.payload.pages.length,
-        edgeCount: exported.payload.graph.edges.length
+        edgeCount: exported.payload.graph.edges.length,
+        encrypted: exported.encrypted
       }
     };
   }
 
   if (message.type === "importKnowledgeGraph") {
-    const imported = parseKnowledgeImport(message.fileContents);
+    const imported = await parseKnowledgeImport(message.fileContents, message.passphrase);
     const [state, existingPages] = await Promise.all([getState(chromeStorageDriver), getAllPageContents()]);
     const mergedPages = mergePageContents(existingPages, imported.pages, message.mode);
     const mergedVisits = mergeImportedVisits(state, imported.visits, message.mode);
