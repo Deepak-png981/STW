@@ -1,14 +1,17 @@
 import type { ChunkEmbedding, KnowledgeChunk, KnowledgeGraph, PageContent } from "@shame-the-web/shared";
 import type { RawPageContent } from "./content-extractor";
 import { extractKeywords } from "./tfidf";
+import { buildIndex, serializeIndex } from "./minisearch-index";
 
 const DB_NAME = "shame-the-web-knowledge";
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const PAGE_STORE = "pageContent";
 const GRAPH_STORE = "knowledgeGraph";
 const CHUNK_STORE = "knowledgeChunks";
 const EMBEDDING_STORE = "chunkEmbeddings";
+const FULLTEXT_STORE = "fulltextIndex";
 const GRAPH_KEY = "graph";
+const FULLTEXT_KEY = "index";
 const MAX_RECORDS = 5000;
 
 function openDb(): Promise<IDBDatabase> {
@@ -32,6 +35,9 @@ function openDb(): Promise<IDBDatabase> {
         embeddingStore.createIndex("pageUrl", "pageUrl", { unique: false });
         embeddingStore.createIndex("chunkId", "chunkId", { unique: true });
       }
+      if (!db.objectStoreNames.contains(FULLTEXT_STORE)) {
+        db.createObjectStore(FULLTEXT_STORE);
+      }
     };
 
     request.onsuccess = () => resolve(request.result);
@@ -51,6 +57,11 @@ export async function storePageContent(raw: RawPageContent): Promise<void> {
     req.onerror = () => reject(req.error);
   });
 
+  // Keep the full-text index in sync with the freshly stored page. A full
+  // rebuild is acceptable here: the page corpus is capped at MAX_RECORDS and
+  // MiniSearch indexes thousands of small docs in a few ms.
+  await rebuildFulltextIndex(db);
+
   // Async prune — fire and forget
   void prunePageContents(db);
 }
@@ -67,7 +78,7 @@ export async function getAllPageContents(): Promise<PageContent[]> {
 
 export async function setAllPageContents(pages: readonly PageContent[]): Promise<void> {
   const db = await openDb();
-  return new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(PAGE_STORE, "readwrite");
     const store = tx.objectStore(PAGE_STORE);
     const clearReq = store.clear();
@@ -80,6 +91,39 @@ export async function setAllPageContents(pages: readonly PageContent[]): Promise
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+
+  await storeFulltextIndex(serializeIndex(buildIndex(pages)));
+}
+
+export async function storeFulltextIndex(serialized: string): Promise<void> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FULLTEXT_STORE, "readwrite");
+    const req = tx.objectStore(FULLTEXT_STORE).put(serialized, FULLTEXT_KEY);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+export async function getFulltextIndex(): Promise<string | null> {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FULLTEXT_STORE, "readonly");
+    const req = tx.objectStore(FULLTEXT_STORE).get(FULLTEXT_KEY);
+    req.onsuccess = () => resolve((req.result as string) ?? null);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function rebuildFulltextIndex(db: IDBDatabase): Promise<void> {
+  const pages = await new Promise<PageContent[]>((resolve, reject) => {
+    const tx = db.transaction(PAGE_STORE, "readonly");
+    const req = tx.objectStore(PAGE_STORE).getAll();
+    req.onsuccess = () => resolve(req.result as PageContent[]);
+    req.onerror = () => reject(req.error);
+  });
+
+  await storeFulltextIndex(serializeIndex(buildIndex(pages)));
 }
 
 export async function storeKnowledgeGraph(graph: KnowledgeGraph): Promise<void> {
