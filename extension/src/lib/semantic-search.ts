@@ -8,6 +8,7 @@ import type {
 } from "@shame-the-web/shared";
 import { buildIndex, searchIndex } from "./minisearch-index";
 import { embedText } from "./local-embeddings";
+import { rerank } from "./rerank";
 
 const MAX_RESULTS = 10;
 
@@ -79,10 +80,13 @@ export async function semanticSearchPages(input: {
       };
     })
     .filter((item): item is SemanticSearchResult => item !== null)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, MAX_RESULTS);
+    .sort((a, b) => b.score - a.score);
 
-  return scored;
+  // Second stage: re-rank the top window with a cross-encoder (opt-in), then keep the best.
+  // rerank() falls back to identity order when disabled or the model is unavailable, so
+  // behavior is unchanged unless "Better answers" is on.
+  const reranked = await rerank(query, scored);
+  return reranked.slice(0, MAX_RESULTS);
 }
 
 function rankChunks(
