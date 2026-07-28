@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "ux-patterns": {
+      "source": "thedaviddias/ux-patterns-for-developers",
+      "sourceType": "github",
+      "skillPath": "skills/ux-patterns/SKILL.md",
+      "computedHash": "cbe531988ae51bf7fc2754a2d09fc6201db080f6d8e10cbf8f2624489e456ac2"
+    }
+  }
+}

@@ -1,0 +1,503 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Shame The Web - Private Browsing Memory</title>
+<!-- Tailwind CSS CDN with plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Kablammo for the headline, Inter for general UI -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Kablammo&amp;display=swap" rel="stylesheet">
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'neon-lime': '#C5E063',
+            'dark-bg': '#131313',
+            'dark-card': '#161616',
+            'muted-text': '#888888',
+          },
+          fontFamily: {
+            kablammo: ['Kablammo', 'cursive'],
+            sans: ['Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="custom-layout-styles">
+    body {
+      background-color: #C5E063; /* Outer frame color updated to new shade */
+      font-family: 'Inter', sans-serif;
+    }
+    .inner-container {
+      background-color: #131313; /* Updated to high-contrast dark theme */
+      border-radius: 24px;
+      margin: 20px;
+      overflow: hidden;
+    }
+    /* Visual separation lines */
+    .section-divider {
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    /* Dashboard Mockup Styling */
+    .dashboard-mockup {
+      background-color: #111111;
+      border: 1px solid #333;
+      border-radius: 12px;
+    }
+  </style>
+<style>
+/* ================= RESPONSIVE FIXES (NO DESIGN CHANGES) ================= */
+
+/* Hero section stacks on small screens */
+@media (max-width: 1024px) {
+  section.grid.grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Header wraps nicely */
+@media (max-width: 768px) {
+  header {
+    flex-wrap: wrap;
+    gap: 16px;
+    justify-content: center;
+    text-align: center;
+  }
+
+  nav {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  nav .flex {
+    flex-wrap: wrap;
+    gap: 16px !important;
+  }
+}
+
+/* Stats bar becomes vertical on mobile */
+@media (max-width: 768px) {
+  section.flex.justify-center {
+    flex-direction: column !important;
+    gap: 24px !important;
+  }
+}
+
+@media (max-width: 1024px) {
+  .how-it-works-line {
+    display: none !important;
+  }
+}
+
+/* Dashboard section stacks */
+@media (max-width: 1024px) {
+  section .grid.grid-cols-2 {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+/* Hero graphic scaling fix */
+@media (max-width: 768px) {
+  .relative.w-80.h-80 {
+    transform: scale(0.8);
+  }
+
+  .inner-container {
+    margin: 10px;
+  }
+}
+
+/* Prevent horizontal overflow */
+body {
+  overflow-x: hidden;
+}
+/* extra safety for Tailwind override */
+img, svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.inner-container {
+  width: 100%;
+}
+</style>
+</head>
+<body class="p-4">
+<!-- BEGIN: MainContainer -->
+<div class="inner-container max-w-[1200px] mx-auto shadow-2xl">
+<!-- BEGIN: MainHeader -->
+<header class="flex items-center justify-between px-10 py-8 bg-neon-lime border border-black">
+<div class="flex items-center gap-2 h-16 overflow-hidden">
+  <div class="flex items-center justify-center">
+    <img alt="Shame The Web Logo"
+      class="h-24 w-auto object-contain scale-125"
+      src="https://lh3.googleusercontent.com/aida-public/AB6AXuA1hRRbp1QkEP7qdi6a1WeSpVfQvHsc7rDupkgeHYKTJmiisUsqdhuav0AdkdhhnFqCDKiPJuIpLdMbI8qIrYAoUsKaA7zfEAfXh-miDaO0QCEgUhCEjS3rQ7YiVvKKymbLevVyZhvuOV0eqbwwKwmsF63AuYaeyKvAHspj7fk_o-3QFW5MUZjB-1H4vwLZKOKSs9S8hf1Q1hFhSdJU4YDEyt9-SQm3RqENwGVPllaOuwcMJfOiKCp36hyvHhKLzXxnYKy-yFj6sw">
+  </div>
+</div>
+<nav class="flex items-center gap-10">
+<div class="flex items-center gap-10 text-sm font-semibold tracking-tight text-black">
+<a class="hover:text-black/70 transition-colors" href="#">How it works</a>
+<a class="hover:text-black/70 transition-colors" href="#">Features</a>
+<a class="hover:text-black/70 transition-colors" href="#">Dashboard</a>
+<a class="hover:text-black/70 transition-colors" href="#">Privacy</a>
+</div>
+<button class="bg-black text-neon-lime px-6 py-2.5 rounded-xl text-sm font-bold hover:brightness-110 transition-all">Get Extension</button>
+</nav>
+</header>
+<!-- END: MainHeader -->
+<main>
+<!-- BEGIN: HeroSection -->
+<section class="px-6 lg:px-10 py-16 grid grid-cols-1 lg:grid-cols-2 gap-12"> 
+<div data-purpose="hero-content">
+<p class="text-neon-lime text-xs font-bold tracking-widest uppercase mb-4">The Private Browsing Memory</p>
+<h1 class="font-kablammo text-4xl sm:text-5xl lg:text-7xl text-white leading-tight mb-8"> 
+            YOUR BROWSING.<br>
+            YOUR MEMORY.<br>
+<span class="text-neon-lime">YOURS ALONE.</span>
+</h1>
+<p class="text-white/70 text-lg max-w-md mb-10 leading-relaxed">
+            Shame The Web builds a private memory of the web you visit and helps you search, understand, and learn from it — all on your device.
+          </p>
+<div class="flex gap-4 mb-10">
+<a class="bg-neon-lime text-black px-6 py-3 rounded-full font-bold flex items-center gap-2 hover:opacity-90 hover:scale-105 hover:shadow-lg hover:shadow-lime-400/40 
+transition-all duration-300" href="https://chromewebstore.google.com/detail/shame-the-web/eklnjfgicliilcojmnphoaacphjihbhp" rel="noopener noreferrer" target="_blank">
+<img src="https://upload.wikimedia.org/wikipedia/commons/8/87/Google_Chrome_icon_%282011%29.png" class="w-5 h-5" alt="Chrome">
+              Get Chrome Extension
+            </a>
+<button class="border border-white/20 text-white px-6 py-3 rounded-full font-bold hover:bg-white/5">
+              Open Dashboard
+            </button>
+</div>
+<div class="flex gap-6 text-[10px] text-white/50 uppercase tracking-widest font-bold">
+<span class="flex items-center gap-1"><span class="text-neon-lime">🔒</span> 100% Local</span>
+<span class="flex items-center gap-1"><span class="text-neon-lime">☁️</span> No Cloud Sync</span>
+<span class="flex items-center gap-1"><span class="text-neon-lime">🛡️</span> Your Data Stays Yours</span>
+</div>
+</div>
+<div class="relative flex items-center justify-center" data-purpose="hero-graphic">
+<!-- Padlock Network Graphic Representation -->
+<div class="relative w-80 h-80 border border-white/5 rounded-full flex items-center justify-center">
+<!-- Central Hub Glow -->
+<div class="absolute inset-0 flex items-center justify-center">
+<div class="w-32 h-32 rounded-full bg-neon-lime/20 blur-3xl"></div>
+</div>
+<!-- Connecting Lines (Decorative SVG) -->
+<svg class="absolute inset-0 w-full h-full opacity-40" fill="none" viewBox="0 0 320 320">
+<line stroke="#C5E063" stroke-width="0.5" x1="160" x2="100" y1="160" y2="50"></line>
+<line stroke="#C5E063" stroke-width="0.5" x1="160" x2="220" y1="160" y2="50"></line>
+<line stroke="#C5E063" stroke-width="0.5" x1="160" x2="60" y1="160" y2="160"></line>
+<line stroke="#C5E063" stroke-width="0.5" x1="160" x2="260" y1="160" y2="180"></line>
+<line stroke="#C5E063" stroke-width="0.5" x1="160" x2="110" y1="160" y2="270"></line>
+<line stroke="#C5E063" stroke-width="0.5" x1="160" x2="210" y1="160" y2="260"></line>
+</svg>
+<!-- Central Lock -->
+<div class="relative z-20 bg-dark-bg border border-neon-lime/50 p-6 rounded-full shadow-[0_0_40px_rgba(197,224,99,0.4)] flex items-center justify-center">
+<div class="absolute inset-0 rounded-full border border-neon-lime/20 scale-125"></div>
+<svg class="w-10 h-10 text-neon-lime" fill="currentColor" viewBox="0 0 24 24">
+<path d="M12 2C9.243 2 7 4.243 7 7v3H6c-1.103 0-2 .897-2 2v8c0 1.103.897 2 2 2h12c1.103 0 2-.897 2-2v-8c0-1.103-.897-2-2-2h-1V7c0-2.757-2.243-5-5-5zm-3 5c0-1.654 1.346-3 3-3s3 1.346 3 3v3H9V7zm5 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+</svg>
+</div>
+<!-- Labeled Nodes -->
+<div class="absolute top-[-10px] left-8 z-30">
+<div class="flex flex-col items-center bg-dark-card/90 border border-white/10 p-2.5 rounded-xl backdrop-blur-sm shadow-xl">
+<div class="flex items-center gap-2 mb-1">
+<div class="w-2.5 h-2.5 rounded-full bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.6)]"></div>
+<span class="text-[10px] text-white font-medium">Artificial</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-2.5 h-2.5 rounded-full bg-green-500/50"></div>
+<span class="text-[10px] text-white/70">Intelligence</span>
+</div>
+</div>
+</div>
+<div class="absolute top-[-5px] right-8 z-30">
+<div class="flex flex-col items-center bg-dark-card/90 border border-white/10 p-2.5 rounded-xl backdrop-blur-sm shadow-xl">
+<div class="flex items-center gap-2 mb-1">
+<div class="w-2.5 h-2.5 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.6)]"></div>
+<span class="text-[10px] text-white font-medium">Design</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-2.5 h-2.5 rounded-full bg-green-900/50"></div>
+<span class="text-[10px] text-white/70">Systems</span>
+</div>
+</div>
+</div>
+<div class="absolute left-[-20px] top-1/2 -translate-y-1/2 z-30">
+<div class="flex flex-col items-center bg-dark-card/90 border border-white/10 p-2.5 rounded-xl backdrop-blur-sm shadow-xl">
+<div class="flex items-center gap-2 mb-1">
+<div class="w-2.5 h-2.5 rounded-full bg-green-400 shadow-[0_0_8px_rgba(74,222,128,0.6)]"></div>
+<span class="text-[10px] text-white font-medium">React</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-2.5 h-2.5 rounded-full bg-green-900/50"></div>
+<span class="text-[10px] text-white/70">Performance</span>
+</div>
+</div>
+</div>
+<div class="absolute right-[-20px] top-1/2 -translate-y-1/2 z-30">
+<div class="flex flex-col items-center bg-dark-card/90 border border-white/10 p-2.5 rounded-xl backdrop-blur-sm shadow-xl">
+<div class="flex items-center gap-2 mb-1">
+<div class="w-2.5 h-2.5 rounded-full bg-purple-500 shadow-[0_0_8px_rgba(168,85,247,0.6)]"></div>
+<span class="text-[10px] text-white font-medium">Human</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-2.5 h-2.5 rounded-full bg-blue-400/50"></div>
+<span class="text-[10px] text-white/70">Psychology</span>
+</div>
+</div>
+</div>
+<div class="absolute bottom-[-15px] left-16 z-30">
+<div class="flex items-center gap-2 bg-dark-card/90 border border-white/10 p-2.5 rounded-xl backdrop-blur-sm shadow-xl">
+<div class="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.6)]"></div>
+<span class="text-[10px] text-white font-medium">Startups</span>
+</div>
+</div>
+<div class="absolute bottom-[-10px] right-12 z-30">
+<div class="flex flex-col items-center bg-dark-card/90 border border-white/10 p-2.5 rounded-xl backdrop-blur-sm shadow-xl">
+<div class="flex items-center gap-2 mb-1">
+<div class="w-2.5 h-2.5 rounded-full bg-teal-400 shadow-[0_0_8px_rgba(45,212,191,0.6)]"></div>
+<span class="text-[10px] text-white font-medium">Reading</span>
+</div>
+<div class="flex items-center gap-2">
+<div class="w-2.5 h-2.5 rounded-full bg-blue-900/50"></div>
+<span class="text-[10px] text-white/70">List</span>
+</div>
+</div>
+</div>
+<!-- Small background nodes -->
+<div class="absolute top-1/4 left-1/4 w-1.5 h-1.5 rounded-full bg-neon-lime/30"></div>
+<div class="absolute bottom-1/4 right-1/4 w-1.5 h-1.5 rounded-full bg-yellow-400/20"></div>
+<div class="absolute top-1/3 right-1/4 w-2 h-2 rounded-full bg-green-400/30 blur-[1px]"></div>
+</div>
+<!-- Search Bar Mockup -->
+<div class="absolute bottom-[-20px] w-[90%] bg-[#111] border border-white/10 rounded-xl p-4 shadow-2xl">
+<div class="flex items-center gap-3">
+<svg class="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+<input class="bg-transparent border-none text-sm text-white focus:ring-0 w-full" disabled="" placeholder="Search your browsing memory..." type="text">
+<div class="bg-neon-lime p-2 rounded-lg cursor-pointer">
+<svg class="w-4 h-4 text-black" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7"></path></svg>
+</div>
+</div>
+<div class="mt-3 text-[10px] text-white/40 font-medium">
+              Try: "What did I read about AI agents?"
+            </div>
+</div>
+</div>
+</section>
+<!-- END: HeroSection -->
+<!-- BEGIN: StatsBar -->
+<section class="px-6 lg:px-10 py-12 flex flex-col sm:flex-row justify-center gap-8 sm:gap-16 border-t border-white/5">
+<div class="text-center">
+<div class="text-3xl font-bold text-neon-lime">1,248</div>
+<div class="text-[10px] text-white/40 uppercase tracking-widest mt-1">Pages Visited</div>
+</div>
+<div class="text-center">
+<div class="text-3xl font-bold text-neon-lime">387</div>
+<div class="text-[10px] text-white/40 uppercase tracking-widest mt-1">Topics Discovered</div>
+</div>
+<div class="text-center">
+<div class="text-3xl font-bold text-neon-lime">86</div>
+<div class="text-[10px] text-white/40 uppercase tracking-widest mt-1">Connections Made</div>
+</div>
+<div class="text-center">
+<div class="text-3xl font-bold text-neon-lime">100%</div>
+<div class="text-[10px] text-white/40 uppercase tracking-widest mt-1">Private</div>
+</div>
+</section>
+<!-- END: StatsBar -->
+<!-- BEGIN: FeaturesSection -->
+<section class="px-6 lg:px-10 py-20 bg-white/[0.02]">
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-12">
+<div class="col-span-12 lg:col-span-4">
+<p class="text-neon-lime text-[10px] font-bold tracking-widest uppercase mb-2">Not just history. Understanding.</p>
+<h2 class="text-3xl text-white font-bold leading-tight">Your browsing history, upgraded to&nbsp; knowledge.</h2>
+</div>
+<div class="col-span-12 lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
+<div class="space-y-4">
+<div class="w-10 h-10 flex items-center justify-center text-neon-lime">
+<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>
+</div>
+<h3 class="text-white font-bold text-sm">Remembers what matters</h3>
+<p class="text-white/40 text-xs leading-relaxed">We extract topics, ideas, and insights from the pages you visit.</p>
+</div>
+<div class="space-y-4">
+<div class="w-10 h-10 flex items-center justify-center text-neon-lime">
+<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>
+</div>
+<h3 class="text-white font-bold text-sm">Connects the dots</h3>
+<p class="text-white/40 text-xs leading-relaxed">Related pages, concepts, and keywords are linked into a private graph.</p>
+</div>
+<div class="space-y-4">
+<div class="w-10 h-10 flex items-center justify-center text-neon-lime">
+<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>
+</div>
+<h3 class="text-white font-bold text-sm">Search that actually works</h3>
+<p class="text-white/40 text-xs leading-relaxed">Semantic search helps you find things you actually read.</p>
+</div>
+<div class="space-y-4">
+<div class="w-10 h-10 flex items-center justify-center text-neon-lime">
+<svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"></path></svg>
+</div>
+<h3 class="text-white font-bold text-sm">Chat with your own memory</h3>
+<p class="text-white/40 text-xs leading-relaxed">Ask questions. Get answers with sources from your browsing.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- END: FeaturesSection -->
+<!-- BEGIN: HowItWorks -->
+<section class="px-10 py-24 text-center">
+<p class="text-neon-lime text-[10px] font-bold tracking-widest uppercase mb-4">How it works</p>
+<h2 class="text-4xl text-white font-bold mb-16">Simple for you. Powerful under the hood.</h2>
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-12 relative">
+<!-- Step Connectors (Dashed Lines) -->
+<div class="how-it-works-line absolute top-12 left-[12%] right-[12%] h-[1px] border-t border-dashed border-white/20"></div>
+<div class="relative z-10 flex flex-col items-center">
+<div class="w-24 h-24 bg-dark-card border border-white/10 rounded-full flex items-center justify-center mb-6">
+<svg class="w-10 h-10 text-neon-lime" fill="currentColor" viewBox="0 0 24 24"><path d="M20.5 11H19V7c0-1.1-.9-2-2-2h-4V3.5C13 2.12 11.88 1 10.5 1S8 2.12 8 3.5V5H4c-1.1 0-1.99.9-1.99 2v3.8H3.5c1.49 0 2.7 1.21 2.7 2.7s-1.21 2.7-2.7 2.7H2V20c0 1.1.9 2 2 2h3.8v-1.5c0-1.49 1.21-2.7 2.7-2.7s2.7 1.21 2.7 2.7V22H17c1.1 0 2-.9 2-2v-4h1.5c1.38 0 2.5-1.12 2.5-2.5S21.88 11 20.5 11z"></path></svg>
+</div>
+<div class="text-white font-bold mb-2">01. Install</div>
+<p class="text-white/40 text-xs px-6">Add the extension and create your local profile.</p>
+</div>
+<div class="relative z-10 flex flex-col items-center">
+<div class="w-24 h-24 bg-dark-card border border-white/10 rounded-full flex items-center justify-center mb-6">
+<svg class="w-10 h-10 text-neon-lime" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path><path d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</div>
+<div class="text-white font-bold mb-2">02. Browse</div>
+<p class="text-white/40 text-xs px-6">Use the web like normal. We observe, locally.</p>
+</div>
+<div class="relative z-10 flex flex-col items-center">
+<div class="w-24 h-24 bg-dark-card border border-white/10 rounded-full flex items-center justify-center mb-6">
+<svg class="w-10 h-10 text-neon-lime" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</div>
+<div class="text-white font-bold mb-2">03. Remember</div>
+<p class="text-white/40 text-xs px-6">Pages are processed and stored in your private graph.</p>
+</div>
+<div class="relative z-10 flex flex-col items-center">
+<div class="w-24 h-24 bg-dark-card border border-white/10 rounded-full flex items-center justify-center mb-6">
+<svg class="w-10 h-10 text-neon-lime" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</div>
+<div class="text-white font-bold mb-2">04. Search &amp; Chat</div>
+<p class="text-white/40 text-xs px-6">Find anything. Ask anything. All from your own memory.</p>
+</div>
+</div>
+</section>
+<!-- END: HowItWorks -->
+<!-- BEGIN: DashboardAndPrivacy -->
+<section class="px-10 py-20 bg-dark-card/50">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-20 items-center">
+<!-- Dashboard Mockup -->
+<div class="dashboard-mockup p-6">
+<div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+<div class="flex items-center gap-3">
+<div class="w-6 h-6 bg-neon-lime rounded flex items-center justify-center">
+<svg class="w-4 h-4 text-black" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"></path></svg>
+</div>
+<span class="text-white text-xs font-bold">Browsing Memory</span>
+</div>
+<div class="relative">
+<input class="bg-black/40 border border-white/10 rounded px-3 py-1 text-[10px] text-white w-full sm:w-40" placeholder="Search your memory..." type="text">
+</div>
+</div>
+<div class="grid grid-cols-1 sm:grid-cols-12 gap-4">
+<div class="col-span-12 sm:col-span-1 sm:space-y-4 flex sm:block gap-4">
+<div class="w-8 h-8 bg-neon-lime/20 text-neon-lime rounded flex items-center justify-center"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg></div>
+<div class="w-8 h-8 text-white/30 flex items-center justify-center"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg></div>
+<div class="w-8 h-8 text-white/30 flex items-center justify-center"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"></path></svg></div>
+</div>
+<div class="col-span-12 sm:col-span-7 bg-black/30 rounded-lg p-4 border border-white/5">
+<div class="text-[10px] text-white/40 mb-4 font-bold uppercase tracking-widest">Recent Connections</div>
+<div class="relative h-24 sm:h-32 lg:h-32 flex items-center justify-center">
+<!-- Graph visual placeholder -->
+<div class="absolute w-full h-full border border-dashed border-white/10 rounded"></div>
+<div class="grid grid-cols-4 gap-2">
+<div class="w-2 h-2 rounded-full bg-neon-lime"></div>
+<div class="w-2 h-2 rounded-full bg-purple-500"></div>
+<div class="w-2 h-2 rounded-full bg-blue-500"></div>
+<div class="w-2 h-2 rounded-full bg-yellow-500"></div>
+</div>
+</div>
+<div class="mt-4 grid grid-cols-4 gap-2">
+<div class="text-center"><div class="text-xs text-white">1,248</div><div class="text-[6px] text-white/40">Pages</div></div>
+<div class="text-center"><div class="text-xs text-white">387</div><div class="text-[6px] text-white/40">Topics</div></div>
+<div class="text-center"><div class="text-xs text-white">86</div><div class="text-[6px] text-white/40">Conns</div></div>
+<div class="text-center"><div class="text-xs text-white">42</div><div class="text-[6px] text-white/40">Tags</div></div>
+</div>
+</div>
+<div class="col-span-12 sm:col-span-4 space-y-2">
+<div class="bg-black/30 p-2 rounded border border-white/5 flex items-center gap-2">
+<div class="w-4 h-4 bg-blue-500/20 rounded"></div>
+<div class="text-[8px] text-white truncate">AI Agents Explained</div>
+</div>
+<div class="bg-black/30 p-2 rounded border border-white/5 flex items-center gap-2">
+<div class="w-4 h-4 bg-green-500/20 rounded"></div>
+<div class="text-[8px] text-white truncate">Building with RAG</div>
+</div>
+<div class="bg-black/30 p-2 rounded border border-white/5 flex items-center gap-2">
+<div class="w-4 h-4 bg-purple-500/20 rounded"></div>
+<div class="text-[8px] text-white truncate">Vector Databases 101</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Privacy Value Prop -->
+<div data-purpose="privacy-section">
+<p class="text-neon-lime text-[10px] font-bold tracking-widest uppercase mb-2">Private by Design</p>
+<h2 class="text-3xl text-white font-bold mb-8">Your data never leaves your device.</h2>
+<ul class="space-y-4 mb-10">
+<li class="flex items-center gap-3 text-white/70 text-sm">
+<svg class="w-5 h-5 text-neon-lime" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                Everything is stored locally
+              </li>
+<li class="flex items-center gap-3 text-white/70 text-sm">
+<svg class="w-5 h-5 text-neon-lime" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                No cloud. No tracking. No selling.
+              </li>
+<li class="flex items-center gap-3 text-white/70 text-sm">
+<svg class="w-5 h-5 text-neon-lime" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                Open source models run on-device
+              </li>
+<li class="flex items-center gap-3 text-white/70 text-sm">
+<svg class="w-5 h-5 text-neon-lime" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+                You own your memory.
+              </li>
+</ul>
+<!-- Quote Block -->
+<div class="relative bg-black/40 border border-white/10 rounded-2xl p-8 overflow-hidden">
+<svg class="absolute top-4 left-4 w-8 h-8 text-white/5" fill="currentColor" viewBox="0 0 24 24"><path d="M14.017 21L14.017 18C14.017 16.8954 14.9124 16 16.017 16L19.017 16C19.5693 16 20.017 15.5523 20.017 15L20.017 13C20.017 12.4477 19.5693 12 19.017 12L15.017 12C13.9124 12 13.017 11.1046 13.017 10L13.017 6C13.017 4.89543 13.9124 4 15.017 4L18.017 4C19.1216 4 20.017 4.89543 20.017 6L20.017 10M6.017 21L6.017 18C6.017 16.8954 6.91243 16 8.017 16L11.017 16C11.5693 16 12.017 15.5523 12.017 15L12.017 13C12.017 12.4477 11.5693 12 11.017 12L7.017 12C5.91243 12 5.017 11.1046 5.017 10L5.017 6C5.017 4.89543 5.91243 4 7.017 4L10.017 4C11.1216 4 12.017 4.89543 12.017 6L12.017 10"></path></svg>
+<div class="relative z-10">
+<p class="text-xl text-white font-medium mb-2"><span class="" style="color: #C5E063; font-size: 40px;">”</span>&nbsp;The web forgets.&nbsp;<br> &nbsp; &nbsp; &nbsp;Your browser doesn't have to.&nbsp;&nbsp;<span style="color: rgb(197, 224, 99); font-size: 40px;">”</span></p><p></p><p></p><p></p><p></p><p></p>
+</div>
+<!-- Large lock watermark -->
+<div class="absolute bottom-[-20px] right-4 opacity-10">
+<svg class="w-24 h-24 text-neon-lime" fill="none" stroke="currentColor" style="filter: drop-shadow(#C5E063 0px 0px 8px);" viewBox="0 0 24 24"><path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- END: DashboardAndPrivacy -->
+</main>
+<!-- BEGIN: Footer -->
+<footer class="px-10 py-8 border-t border-white/5 text-center">
+<p class="text-white/30 text-[10px] uppercase tracking-widest">© 2026 ShameTheWeb. All rights reserved.</p>
+</footer>
+<!-- END: Footer -->
+</div>
+<!-- END: MainContainer -->
+
+
+
+
+
+
+
+
+
+
+
+
+</body></html>
